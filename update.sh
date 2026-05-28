@@ -9,6 +9,7 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 GITHUB_BRANCH="claude/focused-volta-rLmgU"
 
 echo "Pulling latest code..."
+cd "$APP_DIR"
 git fetch origin
 git reset --hard origin/$GITHUB_BRANCH
 
