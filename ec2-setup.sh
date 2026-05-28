@@ -24,8 +24,10 @@ sudo apt-get install -y -qq git curl build-essential
 # ---- 2. Node.js via NodeSource ----
 echo "[2/7] Installing Node.js ${NODE_VERSION}..."
 if ! command -v node &>/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - -q
-  sudo apt-get install -y -qq nodejs
+  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x -o /tmp/nodesource_setup.sh
+  sudo bash /tmp/nodesource_setup.sh
+  rm -f /tmp/nodesource_setup.sh
+  sudo apt-get install -y nodejs
 fi
 echo "  Node $(node -v) | npm $(npm -v)"
 
@@ -90,7 +92,10 @@ pm2 start "$APP_DIR/ecosystem.config.js"
 pm2 save
 
 # Make PM2 start on reboot
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu | tail -1 | sudo bash
+PM2_STARTUP=$(sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu 2>&1 | grep "sudo" | tail -1)
+if [ -n "$PM2_STARTUP" ]; then
+  eval "$PM2_STARTUP"
+fi
 
 echo ""
 echo "======================================================"
