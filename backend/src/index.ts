@@ -19,6 +19,12 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Serve built frontend in production
+const FRONTEND_DIST = path.join(__dirname, '../../frontend/dist');
+if (require('fs').existsSync(FRONTEND_DIST)) {
+  app.use(express.static(FRONTEND_DIST));
+}
+
 initializeDatabase();
 seedDatabase();
 
@@ -32,6 +38,11 @@ app.use('/api/teams', dashboardRouter);
 app.use('/api', uploadsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// SPA fallback — must be after all API routes
+if (require('fs').existsSync(FRONTEND_DIST)) {
+  app.get('*', (_req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+}
 
 app.listen(PORT, () => {
   console.log(`Community Preparation Planning API running on port ${PORT}`);
