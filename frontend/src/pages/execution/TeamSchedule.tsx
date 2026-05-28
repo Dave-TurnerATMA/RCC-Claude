@@ -7,6 +7,7 @@ import PriorityBadge from '../../components/PriorityBadge';
 import StateBadge from '../../components/StateBadge';
 import TaskManageModal from '../../components/TaskManageModal';
 import CreateTaskModal from '../../components/CreateTaskModal';
+import CompleteTaskModal from '../../components/CompleteTaskModal';
 
 export default function TeamSchedule() {
   const { t } = useTranslation();
@@ -18,6 +19,7 @@ export default function TeamSchedule() {
   const [stateFilter, setStateFilter] = useState('active');
   const [order, setOrder] = useState('date');
   const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [taskToComplete, setTaskToComplete] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(async () => {
@@ -109,6 +111,7 @@ export default function TeamSchedule() {
           <TaskCard
             key={task.id} task={task} isOverdue={isOverdue(task)}
             onManage={() => setSelectedTask(task)}
+            onComplete={() => setTaskToComplete(task)}
             onTakeResponsibility={() => takeResponsibility(task)}
             onAssign={async (userId: number) => {
               await api.updateScheduledTask(team!.id, task.id, { responsible_user_id: userId });
@@ -123,6 +126,9 @@ export default function TeamSchedule() {
       {selectedTask && (
         <TaskManageModal task={selectedTask} onClose={() => { setSelectedTask(null); load(); }} />
       )}
+      {taskToComplete && (
+        <CompleteTaskModal task={taskToComplete} onClose={() => setTaskToComplete(null)} onCompleted={() => { setTaskToComplete(null); load(); }} />
+      )}
       {showCreate && (
         <CreateTaskModal onClose={() => { setShowCreate(false); load(); }} />
       )}
@@ -130,7 +136,7 @@ export default function TeamSchedule() {
   );
 }
 
-function TaskCard({ task, isOverdue, onManage, onTakeResponsibility, onAssign, users, isAdmin, isTeamLead, currentUserId }: any) {
+function TaskCard({ task, isOverdue, onManage, onComplete, onTakeResponsibility, onAssign, users, isAdmin, isTeamLead, currentUserId }: any) {
   const { t } = useTranslation();
   const [showAssign, setShowAssign] = useState(false);
 
@@ -194,12 +200,17 @@ function TaskCard({ task, isOverdue, onManage, onTakeResponsibility, onAssign, u
           )}
         </div>
 
-        <div className="flex gap-2">
-          <button onClick={onManage} className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition-colors">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={onManage} className="py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition-colors">
             {t('common.manage')}
           </button>
+          {task.state === 'pending' && (
+            <button onClick={onComplete} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
+              ✅ Complete
+            </button>
+          )}
           {!task.responsible_user_name && task.state === 'pending' && (
-            <button onClick={onTakeResponsibility} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
+            <button onClick={onTakeResponsibility} className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
               {t('task.takeResponsibility')}
             </button>
           )}

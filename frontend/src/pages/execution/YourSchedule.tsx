@@ -157,15 +157,15 @@ function MyTaskCard({ task, isOverdue, currentUserId, onComplete, onDetails, onR
           <button onClick={onDetails} className="py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition-colors flex items-center gap-1">
             📊 Details
           </button>
+          {task.state === 'pending' && (
+            <button onClick={onComplete} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
+              ✅ Complete
+            </button>
+          )}
           {task.state === 'pending' && isResponsible && (
-            <>
-              <button onClick={onComplete} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors">
-                ✅ Complete
-              </button>
-              <button onClick={onReassign} className="py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-colors">
-                {t('task.reassign')}
-              </button>
-            </>
+            <button onClick={onReassign} className="py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-colors">
+              {t('task.reassign')}
+            </button>
           )}
           {!isResponsible && task.state === 'pending' && (
             <button onClick={onLeaveTeam} className="py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors">
