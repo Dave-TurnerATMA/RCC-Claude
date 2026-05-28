@@ -13,11 +13,12 @@ git fetch origin
 git reset --hard origin/$GITHUB_BRANCH
 
 echo "Installing/updating dependencies..."
-cd "$APP_DIR/backend"  && npm install --omit=dev --silent
+cd "$APP_DIR/backend"  && npm install --silent
 cd "$APP_DIR/frontend" && npm install --silent
 
-echo "Rebuilding frontend..."
+echo "Rebuilding..."
 cd "$APP_DIR/frontend" && npm run build
+cd "$APP_DIR/backend"  && npx tsc
 
 echo "Restarting app..."
 pm2 restart community-prep

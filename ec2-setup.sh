@@ -42,12 +42,13 @@ fi
 
 # ---- 4. Install dependencies ----
 echo "[4/7] Installing dependencies..."
-cd "$APP_DIR/backend"  && npm install --omit=dev --silent
+cd "$APP_DIR/backend"  && npm install --silent   # needs devDeps to compile TS
 cd "$APP_DIR/frontend" && npm install --silent
 
-# ---- 5. Build frontend ----
-echo "[5/7] Building frontend..."
+# ---- 5. Build frontend and compile backend ----
+echo "[5/7] Building frontend and compiling backend..."
 cd "$APP_DIR/frontend" && npm run build
+cd "$APP_DIR/backend"  && npx tsc                # compile TS → dist/
 
 # ---- 6. Create .env file ----
 echo "[6/7] Creating environment config..."
@@ -63,13 +64,12 @@ sudo npm install -g pm2 --silent
 
 cd "$APP_DIR/backend"
 
-# Create PM2 ecosystem config
+# Create PM2 ecosystem config — run compiled JS, no ts-node needed
 cat > "$APP_DIR/ecosystem.config.js" <<EOF
 module.exports = {
   apps: [{
     name: 'community-prep',
-    script: 'node_modules/.bin/ts-node',
-    args: 'src/index.ts',
+    script: 'dist/index.js',
     cwd: '${APP_DIR}/backend',
     env: {
       PORT: '${APP_PORT}',
