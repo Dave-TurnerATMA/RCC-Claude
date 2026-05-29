@@ -122,10 +122,10 @@ module.exports = {
     name: 'community-prep',
     script: 'dist/index.js',
     cwd: '${APP_DIR}/backend',
-    env_file: '${APP_DIR}/backend/.env',
     env: {
       PORT: '${APP_PORT}',
       NODE_ENV: 'production',
+      ANTHROPIC_API_KEY: '${ANTHROPIC_API_KEY}',
     },
     error_file: '${APP_DIR}/logs/err.log',
     out_file:   '${APP_DIR}/logs/out.log',
