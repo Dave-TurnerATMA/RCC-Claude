@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import Anthropic from '@anthropic-ai/sdk';
 import db from '../db/database';
 
-const anthropic = new Anthropic();
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -49,6 +49,9 @@ if (require('fs').existsSync(FRONTEND_DIST)) {
 
 app.listen(PORT, () => {
   console.log(`Community Preparation Planning API running on port ${PORT}`);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('WARNING: ANTHROPIC_API_KEY is not set — spreadsheet import and AI features will fail');
+  }
 });
 
 export default app;
