@@ -11,6 +11,7 @@ import equipmentRouter from './routes/equipment';
 import notificationsRouter from './routes/notifications';
 import dashboardRouter from './routes/dashboard';
 import uploadsRouter from './routes/uploads';
+import spreadsheetRouter from './routes/spreadsheet';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +37,7 @@ app.use('/api/teams', equipmentRouter);
 app.use('/api/teams', notificationsRouter);
 app.use('/api/teams', dashboardRouter);
 app.use('/api', uploadsRouter);
+app.use('/api', spreadsheetRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
