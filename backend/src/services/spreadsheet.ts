@@ -4,10 +4,14 @@ import db from '../db/database';
 
 const anthropic = new Anthropic();
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export interface ColumnDef {
   name: string;
   sqlType: string;
   nullable: boolean;
+  /** True when this column may hold non-English text that should be translated. */
+  translatable?: boolean;
 }
 
 export interface TableSchema {
@@ -16,7 +20,8 @@ export interface TableSchema {
   description: string;
 }
 
-export interface ImportResult {
+export interface TabResult {
+  tabName: string;
   tableName: string;
   schema: TableSchema;
   rowsInserted: number;
@@ -24,26 +29,49 @@ export interface ImportResult {
   errors: string[];
 }
 
-function parseSpreadsheet(filePath: string): { headers: string[]; rows: Record<string, unknown>[] } {
-  const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
-
-  if (raw.length === 0) return { headers: [], rows: [] };
-
-  const headers = Object.keys(raw[0]);
-  return { headers, rows: raw };
+export interface ImportResult {
+  fileName: string;
+  tabs: TabResult[];
 }
+
+// ─── Parsing ──────────────────────────────────────────────────────────────────
+
+interface SheetData {
+  tabName: string;
+  headers: string[];
+  rows: Record<string, unknown>[];
+}
+
+function parseSpreadsheet(filePath: string): SheetData[] {
+  const workbook = XLSX.readFile(filePath);
+  const results: SheetData[] = [];
+
+  for (const tabName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[tabName];
+    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+    if (raw.length === 0) continue;
+    results.push({ tabName, headers: Object.keys(raw[0]), rows: raw });
+  }
+
+  return results;
+}
+
+// ─── Schema inference ─────────────────────────────────────────────────────────
 
 function sampleRows(rows: Record<string, unknown>[], max = 10): Record<string, unknown>[] {
   return rows.slice(0, max);
 }
 
-async function inferSchema(headers: string[], sample: Record<string, unknown>[], fileName: string): Promise<TableSchema> {
-  const prompt = `You are a database architect. Analyze this spreadsheet data and design a SQLite table schema.
+async function inferSchema(
+  headers: string[],
+  sample: Record<string, unknown>[],
+  baseName: string,
+  tabName: string,
+): Promise<TableSchema> {
+  const prompt = `You are a database architect. Analyze this spreadsheet tab and design a SQLite table schema.
 
-File name: ${fileName}
+File base name: ${baseName}
+Tab name: ${tabName}
 Column headers: ${JSON.stringify(headers)}
 Sample rows (up to 10):
 ${JSON.stringify(sample, null, 2)}
@@ -56,17 +84,20 @@ Respond with ONLY valid JSON matching this exact shape:
     {
       "name": "snake_case_column_name",
       "sqlType": "TEXT | INTEGER | REAL | NUMERIC | BLOB",
-      "nullable": true
+      "nullable": true,
+      "translatable": false
     }
   ]
 }
 
 Rules:
-- tableName must be lowercase snake_case, descriptive, and based on the file name or content
-- Always include an "id INTEGER PRIMARY KEY AUTOINCREMENT" as the first column
-- Map column names to snake_case
-- Infer the best SQLite type from the sample values (INTEGER for whole numbers, REAL for decimals, TEXT for strings/dates)
+- tableName must be lowercase snake_case, descriptive, derived from the tab name (preferred) or file name
+- Always include an "id INTEGER PRIMARY KEY AUTOINCREMENT" as the first column (translatable: false)
+- Map column headers to snake_case names
+- Infer the best SQLite type from the sample values (INTEGER for whole numbers, REAL for decimals, TEXT for everything else)
 - Set nullable: false only if every sample row has a non-empty value for that column
+- Set translatable: true for TEXT columns that appear to contain natural-language text that could be in a non-English language (names, descriptions, addresses, notes, etc.)
+- Set translatable: false for codes, numbers, dates, IDs, URLs, or English-only fields
 - Do not include any explanation — only the JSON object`;
 
   const message = await anthropic.messages.create({
@@ -81,13 +112,26 @@ Rules:
 
   const schema: TableSchema = JSON.parse(jsonMatch[0]);
 
-  // Ensure id column is first and present
   if (!schema.columns.find(c => c.name === 'id')) {
-    schema.columns.unshift({ name: 'id', sqlType: 'INTEGER PRIMARY KEY AUTOINCREMENT', nullable: false });
+    schema.columns.unshift({ name: 'id', sqlType: 'INTEGER PRIMARY KEY AUTOINCREMENT', nullable: false, translatable: false });
   }
 
+  // Inject source_tab and translatable _en columns into the schema
+  const withMeta: ColumnDef[] = [];
+  for (const col of schema.columns) {
+    withMeta.push(col);
+    if (col.translatable && col.name !== 'id') {
+      withMeta.push({ name: `${col.name}_en`, sqlType: 'TEXT', nullable: true, translatable: false });
+    }
+  }
+  // source_tab tracks which spreadsheet tab the row came from
+  withMeta.push({ name: 'source_tab', sqlType: 'TEXT', nullable: false, translatable: false });
+
+  schema.columns = withMeta;
   return schema;
 }
+
+// ─── DDL ──────────────────────────────────────────────────────────────────────
 
 function buildCreateTableSQL(schema: TableSchema): string {
   const cols = schema.columns.map(col => {
@@ -98,6 +142,62 @@ function buildCreateTableSQL(schema: TableSchema): string {
   return `CREATE TABLE IF NOT EXISTS ${schema.tableName} (\n  ${cols.join(',\n  ')}\n)`;
 }
 
+// ─── Translation ──────────────────────────────────────────────────────────────
+
+/**
+ * Batch-translates an array of unique strings to English in a single Claude call.
+ * Returns a map from original value → English translation.
+ * Values that are already English are returned unchanged.
+ */
+async function batchTranslate(values: string[]): Promise<Map<string, string>> {
+  if (values.length === 0) return new Map();
+
+  const prompt = `Translate each of the following text values to English.
+If a value is already in English, return it unchanged.
+Respond ONLY with a JSON object mapping each original value to its English translation.
+Do not add explanations or extra keys.
+
+Values to translate:
+${JSON.stringify(values)}`;
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return new Map();
+
+  const parsed: Record<string, string> = JSON.parse(jsonMatch[0]);
+  return new Map(Object.entries(parsed));
+}
+
+/**
+ * For each translatable column, collect all unique non-null string values,
+ * translate them in one batch, and return a cache keyed by column name.
+ */
+async function buildTranslationCache(
+  rows: Record<string, unknown>[],
+  translatableColumns: string[],
+): Promise<Map<string, Map<string, string>>> {
+  const cache = new Map<string, Map<string, string>>();
+
+  for (const col of translatableColumns) {
+    const unique = [...new Set(
+      rows
+        .map(r => r[col])
+        .filter((v): v is string => typeof v === 'string' && v.trim() !== ''),
+    )];
+    cache.set(col, await batchTranslate(unique));
+  }
+
+  return cache;
+}
+
+// ─── Column name helpers ──────────────────────────────────────────────────────
+
 function sanitizeColumnName(header: string): string {
   return header
     .toLowerCase()
@@ -106,17 +206,46 @@ function sanitizeColumnName(header: string): string {
     .replace(/^(\d)/, '_$1') || 'col';
 }
 
-export async function importSpreadsheet(filePath: string, originalFileName: string): Promise<ImportResult> {
-  const { headers, rows } = parseSpreadsheet(filePath);
+// ─── Registry table ───────────────────────────────────────────────────────────
 
-  if (headers.length === 0) throw new Error('Spreadsheet is empty or has no headers');
+export function initSpreadsheetRegistry() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spreadsheet_imports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_name TEXT NOT NULL,
+      imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+      tabs TEXT NOT NULL
+    )
+  `);
+}
 
+// ─── Per-tab import ───────────────────────────────────────────────────────────
+
+async function importTab(
+  sheet: SheetData,
+  baseName: string,
+  usedTableNames: Set<string>,
+): Promise<TabResult> {
+  const { tabName, headers, rows } = sheet;
   const sample = sampleRows(rows);
-  const baseName = originalFileName.replace(/\.[^.]+$/, '');
-  const schema = await inferSchema(headers, sample, baseName);
+  const schema = await inferSchema(headers, sample, baseName, tabName);
 
-  // Build a mapping from original header → sanitized column name (skipping id)
-  const dataColumns = schema.columns.filter(c => c.name !== 'id');
+  // Disambiguate if two tabs resolve to the same table name
+  let finalTableName = schema.tableName;
+  let suffix = 2;
+  while (usedTableNames.has(finalTableName)) {
+    finalTableName = `${schema.tableName}_${suffix++}`;
+  }
+  schema.tableName = finalTableName;
+  usedTableNames.add(finalTableName);
+
+  const ddl = buildCreateTableSQL(schema);
+  db.exec(ddl);
+
+  // Build header → column mapping (skip id, source_tab, and _en columns)
+  const dataColumns = schema.columns.filter(
+    c => c.name !== 'id' && c.name !== 'source_tab' && !c.name.endsWith('_en'),
+  );
   const headerToColumn: Record<string, string> = {};
   headers.forEach(h => {
     const sanitized = sanitizeColumnName(h);
@@ -124,13 +253,40 @@ export async function importSpreadsheet(filePath: string, originalFileName: stri
     if (matched) headerToColumn[h] = matched.name;
   });
 
-  const ddl = buildCreateTableSQL(schema);
-  db.exec(ddl);
+  // Identify translatable columns (using original header keys in rows)
+  const translatableColNames = dataColumns
+    .filter(c => c.translatable)
+    .map(c => c.name);
 
-  const colNames = dataColumns.map(c => c.name);
-  const placeholders = colNames.map(() => '?').join(', ');
+  // Map column names back to original headers for lookup
+  const colToHeader: Record<string, string> = {};
+  for (const [h, col] of Object.entries(headerToColumn)) {
+    colToHeader[col] = h;
+  }
+
+  // Build translation cache: keyed by column name → original value → english
+  const translatableHeaderKeys = translatableColNames
+    .map(col => colToHeader[col])
+    .filter((h): h is string => !!h);
+
+  // Re-key translation cache by column name for lookup during insert
+  const rawCache = await buildTranslationCache(rows, translatableHeaderKeys);
+  const translationCache = new Map<string, Map<string, string>>();
+  for (const col of translatableColNames) {
+    const header = colToHeader[col];
+    if (header && rawCache.has(header)) {
+      translationCache.set(col, rawCache.get(header)!);
+    }
+  }
+
+  // All columns to insert (excludes id, includes source_tab and _en columns)
+  const insertCols = schema.columns
+    .filter(c => c.name !== 'id')
+    .map(c => c.name);
+
+  const placeholders = insertCols.map(() => '?').join(', ');
   const insert = db.prepare(
-    `INSERT INTO ${schema.tableName} (${colNames.join(', ')}) VALUES (${placeholders})`
+    `INSERT INTO ${schema.tableName} (${insertCols.join(', ')}) VALUES (${placeholders})`,
   );
 
   let rowsInserted = 0;
@@ -140,8 +296,19 @@ export async function importSpreadsheet(filePath: string, originalFileName: stri
   const insertMany = db.transaction((dataRows: Record<string, unknown>[]) => {
     for (const row of dataRows) {
       try {
-        const values = colNames.map(col => {
-          const origHeader = Object.keys(headerToColumn).find(h => headerToColumn[h] === col);
+        const values = insertCols.map(col => {
+          if (col === 'source_tab') return tabName;
+
+          // _en columns get the translated value
+          if (col.endsWith('_en')) {
+            const baseCol = col.slice(0, -3);
+            const origHeader = colToHeader[baseCol];
+            const origVal = origHeader ? row[origHeader] : null;
+            if (typeof origVal !== 'string' || !origVal) return null;
+            return translationCache.get(baseCol)?.get(origVal) ?? origVal;
+          }
+
+          const origHeader = colToHeader[col];
           if (!origHeader) return null;
           const val = row[origHeader];
           return val === undefined ? null : val;
@@ -159,5 +326,33 @@ export async function importSpreadsheet(filePath: string, originalFileName: stri
 
   insertMany(rows);
 
-  return { tableName: schema.tableName, schema, rowsInserted, skippedRows, errors };
+  return { tabName, tableName: schema.tableName, schema, rowsInserted, skippedRows, errors };
+}
+
+// ─── Main entry point ─────────────────────────────────────────────────────────
+
+export async function importSpreadsheet(filePath: string, originalFileName: string): Promise<ImportResult> {
+  initSpreadsheetRegistry();
+
+  const sheets = parseSpreadsheet(filePath);
+  if (sheets.length === 0) throw new Error('Spreadsheet has no data in any tab');
+
+  const baseName = originalFileName.replace(/\.[^.]+$/, '');
+  const usedTableNames = new Set<string>();
+  const tabs: TabResult[] = [];
+
+  for (const sheet of sheets) {
+    const result = await importTab(sheet, baseName, usedTableNames);
+    tabs.push(result);
+  }
+
+  // Record the import in the registry
+  db.prepare(
+    `INSERT INTO spreadsheet_imports (file_name, tabs) VALUES (?, ?)`,
+  ).run(
+    originalFileName,
+    JSON.stringify(tabs.map(t => ({ tabName: t.tabName, tableName: t.tableName, rowCount: t.rowsInserted }))),
+  );
+
+  return { fileName: originalFileName, tabs };
 }
