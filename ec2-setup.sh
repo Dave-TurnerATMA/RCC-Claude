@@ -9,7 +9,7 @@ set -e
 APP_DIR="/home/ubuntu/community-prep"
 APP_PORT="3001"
 GITHUB_REPO="https://github.com/Dave-TurnerATMA/RCC-Claude.git"
-GITHUB_BRANCH="claude/focused-volta-rLmgU"
+GITHUB_BRANCH="claude/zen-cori-U3olx"
 NODE_VERSION="20"
 
 echo "======================================================"

@@ -74,4 +74,26 @@ export const api = {
     if (!res.ok) throw new Error('Upload failed');
     return res.json();
   },
+
+  // Spreadsheet import
+  importSpreadsheet: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/spreadsheet/import`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+    return res.json();
+  },
+  getSpreadsheetImports: () => api.get('/spreadsheet/imports'),
+  getSpreadsheetTables: () => api.get('/spreadsheet/tables'),
+  getSpreadsheetRows: (tableName: string, opts: { limit?: number; offset?: number; tab?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.limit)  q.set('limit',  String(opts.limit));
+    if (opts.offset) q.set('offset', String(opts.offset));
+    if (opts.tab)    q.set('tab',    opts.tab);
+    const qs = q.toString();
+    return api.get(`/spreadsheet/tables/${tableName}/rows${qs ? '?' + qs : ''}`);
+  },
 };

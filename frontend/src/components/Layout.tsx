@@ -23,6 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { path: '/admin/resources', label: t('nav.resources'), icon: '🛠️' },
     { path: '/admin/team-members', label: t('nav.teamMembers'), icon: '👥' },
     { path: '/admin/reference', label: t('nav.reference'), icon: '📚' },
+    { path: '/admin/spreadsheet', label: 'Spreadsheet', icon: '📊' },
   ];
 
   const tabs = isExec ? execTabs : adminTabs;

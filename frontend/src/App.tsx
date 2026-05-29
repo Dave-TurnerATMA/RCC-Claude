@@ -10,6 +10,7 @@ import RequiredTasks from './pages/admin/RequiredTasks';
 import Resources from './pages/admin/Resources';
 import TeamMembers from './pages/admin/TeamMembers';
 import Reference from './pages/admin/Reference';
+import SpreadsheetImport from './pages/admin/SpreadsheetImport';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { team, user } = useApp();
@@ -38,6 +39,7 @@ export default function App() {
       <Route path="/admin/resources" element={<AdminRoute><Resources /></AdminRoute>} />
       <Route path="/admin/team-members" element={<AdminRoute><TeamMembers /></AdminRoute>} />
       <Route path="/admin/reference" element={<AdminRoute><Reference /></AdminRoute>} />
+      <Route path="/admin/spreadsheet" element={<AdminRoute><SpreadsheetImport /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
