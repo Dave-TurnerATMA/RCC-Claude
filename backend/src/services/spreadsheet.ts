@@ -4,6 +4,35 @@ import db from '../db/database';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+/**
+ * Extracts the first syntactically complete JSON object from a string by
+ * tracking brace depth. This is more reliable than a greedy regex when
+ * Claude adds explanatory text before or after the JSON.
+ */
+function extractJSON(text: string): string | null {
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ColumnDef {
@@ -107,12 +136,12 @@ Rules:
   });
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const jsonMatch = extractJSON(text);
   if (!jsonMatch) throw new Error('Claude did not return valid JSON schema');
 
   let schema: TableSchema;
   try {
-    schema = JSON.parse(jsonMatch[0]);
+    schema = JSON.parse(jsonMatch);
   } catch (e) {
     throw new Error(`Claude returned malformed JSON schema: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -176,12 +205,12 @@ ${numbered}`;
   });
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  const jsonMatch = extractJSON(text);
   if (!jsonMatch) return new Map();
 
   let parsed: Record<string, string>;
   try {
-    parsed = JSON.parse(jsonMatch[0]);
+    parsed = JSON.parse(jsonMatch);
   } catch {
     // If JSON is still malformed, fall back — return originals untranslated
     console.warn('batchTranslate: failed to parse Claude response, skipping translation');
