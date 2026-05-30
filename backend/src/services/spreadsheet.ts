@@ -127,7 +127,7 @@ Rules:
 - Set nullable: false only if every sample row has a non-empty value for that column
 - Set translatable: true for TEXT columns that appear to contain natural-language text that could be in a non-English language (names, descriptions, addresses, notes, etc.)
 - Set translatable: false for codes, numbers, dates, IDs, URLs, or English-only fields
-- Do not include any explanation — only the JSON object`;
+- Your entire response must be the raw JSON object only — no markdown fences, no explanation, no text before or after`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
@@ -135,14 +135,24 @@ Rules:
     messages: [{ role: 'user', content: prompt }],
   });
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  // Strip markdown code fences (```json ... ``` or ``` ... ```) before extracting
+  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+  console.debug('[inferSchema] Claude raw response:', text.slice(0, 300));
+
   const jsonMatch = extractJSON(text);
-  if (!jsonMatch) throw new Error('Claude did not return valid JSON schema');
+  if (!jsonMatch) {
+    console.error('[inferSchema] Full Claude response:', raw);
+    throw new Error('Claude did not return valid JSON schema — check pm2 logs for the raw response');
+  }
 
   let schema: TableSchema;
   try {
     schema = JSON.parse(jsonMatch);
   } catch (e) {
+    console.error('[inferSchema] Extracted JSON that failed to parse:', jsonMatch);
     throw new Error(`Claude returned malformed JSON schema: ${e instanceof Error ? e.message : String(e)}`);
   }
 
