@@ -110,7 +110,12 @@ Rules:
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Claude did not return valid JSON schema');
 
-  const schema: TableSchema = JSON.parse(jsonMatch[0]);
+  let schema: TableSchema;
+  try {
+    schema = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    throw new Error(`Claude returned malformed JSON schema: ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   if (!schema.columns.find(c => c.name === 'id')) {
     schema.columns.unshift({ name: 'id', sqlType: 'INTEGER PRIMARY KEY AUTOINCREMENT', nullable: false, translatable: false });
@@ -146,19 +151,23 @@ function buildCreateTableSQL(schema: TableSchema): string {
 
 /**
  * Batch-translates an array of unique strings to English in a single Claude call.
+ * Uses a numbered list format to avoid JSON-escaping issues with the source values.
  * Returns a map from original value → English translation.
- * Values that are already English are returned unchanged.
  */
 async function batchTranslate(values: string[]): Promise<Map<string, string>> {
   if (values.length === 0) return new Map();
 
-  const prompt = `Translate each of the following text values to English.
-If a value is already in English, return it unchanged.
-Respond ONLY with a JSON object mapping each original value to its English translation.
-Do not add explanations or extra keys.
+  // Use index-based format so special characters in values don't break JSON parsing.
+  // Claude returns {"0": "translation", "1": "translation", ...}
+  const numbered = values.map((v, i) => `${i}: ${v}`).join('\n');
 
-Values to translate:
-${JSON.stringify(values)}`;
+  const prompt = `Translate each numbered text value below to English.
+If a value is already in English, return it unchanged.
+Respond ONLY with a JSON object where keys are the index numbers (as strings) and values are the English translations.
+Example: {"0": "Hello", "1": "Goodbye"}
+
+Text to translate:
+${numbered}`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
@@ -167,11 +176,24 @@ ${JSON.stringify(values)}`;
   });
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
   if (!jsonMatch) return new Map();
 
-  const parsed: Record<string, string> = JSON.parse(jsonMatch[0]);
-  return new Map(Object.entries(parsed));
+  let parsed: Record<string, string>;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    // If JSON is still malformed, fall back — return originals untranslated
+    console.warn('batchTranslate: failed to parse Claude response, skipping translation');
+    return new Map();
+  }
+
+  const result = new Map<string, string>();
+  values.forEach((original, i) => {
+    const translation = parsed[String(i)];
+    result.set(original, translation ?? original);
+  });
+  return result;
 }
 
 /**
