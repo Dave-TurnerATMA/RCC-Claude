@@ -22,7 +22,7 @@ function enrichTask(task: any) {
 }
 
 router.get('/:teamId/scheduled-tasks', (req, res) => {
-  const { state, type, view, user_id, order } = req.query as any;
+  const { state, type, view, user_id, order, required_task_id } = req.query as any;
 
   // Auto-mark missed: recurring tasks that are overdue
   db.prepare(
@@ -48,6 +48,7 @@ router.get('/:teamId/scheduled-tasks', (req, res) => {
   }
 
   if (type) { query += ` AND st.type = ?`; params.push(type); }
+  if (required_task_id) { query += ` AND st.required_task_id = ?`; params.push(required_task_id); }
 
   if (view === 'mine' && user_id) {
     query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM task_crew tc WHERE tc.scheduled_task_id = st.id AND tc.user_id = ?) OR st.crew_type IN ('open_optional','all_expected'))`;
@@ -74,7 +75,7 @@ router.get('/:teamId/scheduled-tasks', (req, res) => {
 });
 
 router.get('/:teamId/scheduled-tasks/history', (req, res) => {
-  const { user_id } = req.query as any;
+  const { user_id, required_task_id } = req.query as any;
   let query = `
     SELECT st.*, u.name as responsible_user_name
     FROM scheduled_tasks st
@@ -85,6 +86,10 @@ router.get('/:teamId/scheduled-tasks/history', (req, res) => {
   if (user_id) {
     query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM task_crew tc WHERE tc.scheduled_task_id = st.id AND tc.user_id = ?))`;
     params.push(user_id, user_id);
+  }
+  if (required_task_id) {
+    query += ` AND st.required_task_id = ?`;
+    params.push(required_task_id);
   }
   query += ' ORDER BY st.completed_at DESC, st.updated_at DESC LIMIT 100';
   const tasks = db.prepare(query).all(...params);

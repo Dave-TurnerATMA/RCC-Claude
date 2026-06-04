@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { useApp } from '../../contexts/AppContext';
 import Modal from '../../components/Modal';
 import PriorityBadge from '../../components/PriorityBadge';
+import StateBadge from '../../components/StateBadge';
 
 export default function RequiredTasks() {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export default function RequiredTasks() {
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [viewTask, setViewTask] = useState<any>(null);
+  const [scheduledTask, setScheduledTask] = useState<any>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
@@ -137,7 +139,8 @@ export default function RequiredTasks() {
                           <TaskRow key={task.id} task={task}
                             onView={() => setViewTask(task)}
                             onEdit={() => setEditTask(task)}
-                            onArchive={() => archive(task)} />
+                            onArchive={() => archive(task)}
+                            onScheduled={() => setScheduledTask(task)} />
                         ))
                       )}
                     </div>
@@ -158,7 +161,8 @@ export default function RequiredTasks() {
                     <TaskRow key={task.id} task={task}
                       onView={() => setViewTask(task)}
                       onEdit={() => setEditTask(task)}
-                      onArchive={() => archive(task)} />
+                      onArchive={() => archive(task)}
+                      onScheduled={() => setScheduledTask(task)} />
                   ))}
                 </div>
               </div>
@@ -197,11 +201,16 @@ export default function RequiredTasks() {
       {viewTask && (
         <RequiredTaskDetail task={viewTask} onClose={() => setViewTask(null)} />
       )}
+
+      {scheduledTask && (
+        <ScheduledTasksModal task={scheduledTask} onClose={() => setScheduledTask(null)} />
+      )}
     </div>
   );
 }
 
-function TaskRow({ task, onView, onEdit, onArchive }: any) {
+function TaskRow({ task, onView, onEdit, onArchive, onScheduled }: any) {
+  const hasSchedule = !!task.scheduled_date;
   return (
     <div className="px-4 py-3">
       <div className="flex items-start gap-2 mb-1.5">
@@ -209,20 +218,33 @@ function TaskRow({ task, onView, onEdit, onArchive }: any) {
         <PriorityBadge priority={task.priority} />
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-2.5">
-        {task.frequency_days && <span>🔄 Every {task.frequency_days} days</span>}
+        {task.is_recurring ? (
+          task.frequency_days && <span>🔄 Every {task.frequency_days} days</span>
+        ) : (
+          <span>📌 One-off</span>
+        )}
         {task.estimate_hours && <span>⏱ {task.estimate_hours}h est.</span>}
         {task.completion_count > 0 && <span>✅ {task.completion_count} done</span>}
-        {task.last_completed_at && (
-          <span>Last: {new Date(task.last_completed_at).toLocaleDateString()}</span>
-        )}
+        {task.scheduled_date && <span>📅 {new Date(task.scheduled_date + 'T00:00:00').toLocaleDateString()}</span>}
         {task.responsible_user_name && <span>👤 {task.responsible_user_name}</span>}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button onClick={onView} className="py-1.5 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium">
           Details
         </button>
         <button onClick={onEdit} className="py-1.5 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium">
           Edit
+        </button>
+        <button
+          onClick={hasSchedule ? onScheduled : undefined}
+          disabled={!hasSchedule}
+          title={hasSchedule ? 'View scheduled instances' : 'No scheduled date set'}
+          className={`py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors ${
+            hasSchedule
+              ? 'bg-purple-50 hover:bg-purple-100 text-purple-700'
+              : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+          }`}>
+          📅 Scheduled
         </button>
         <button onClick={onArchive} className="py-1.5 px-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium">
           Archive
@@ -541,6 +563,186 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
           </button>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+function ScheduledTasksModal({ task, onClose }: { task: any; onClose: () => void }) {
+  const { team } = useApp();
+  const [activeTasks, setActiveTasks] = useState<any[]>([]);
+  const [historyTasks, setHistoryTasks] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!team) return;
+    setLoading(true);
+    Promise.all([
+      api.getScheduledTasks(team.id, { required_task_id: String(task.id) }),
+      api.getScheduledTaskHistory(team.id, { required_task_id: String(task.id) }),
+    ]).then(([active, history]) => {
+      setActiveTasks(active);
+      setHistoryTasks(history);
+    }).finally(() => setLoading(false));
+  }, [team?.id, task.id]);
+
+  const isOneOff = !task.is_recurring;
+  const allTasks = [...activeTasks, ...(showHistory ? historyTasks : [])].sort((a, b) =>
+    (a.scheduled_date || '').localeCompare(b.scheduled_date || '')
+  );
+  const singleTask = allTasks[0] ?? activeTasks[0] ?? historyTasks[0];
+
+  const stateLabel: Record<string, string> = {
+    pending: 'Pending', planned: 'Planned', completed: 'Completed',
+    abandoned: 'Abandoned', not_required: 'Not Required', missed: 'Missed',
+  };
+
+  return (
+    <Modal isOpen title={`${task.short_description} — Scheduled`} onClose={onClose} size="lg">
+      {loading ? (
+        <div className="text-center py-10 text-gray-400">Loading...</div>
+      ) : isOneOff ? (
+        /* One-off: show detail of the single scheduled task */
+        <div className="space-y-4">
+          {!singleTask ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No scheduled instance found.</div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <StateBadge state={singleTask.state} size="md" />
+                <PriorityBadge priority={singleTask.priority} />
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-0.5">Scheduled Date</div>
+                  <div className="font-medium">
+                    {singleTask.scheduled_date
+                      ? new Date(singleTask.scheduled_date + 'T00:00:00').toLocaleDateString()
+                      : '—'}
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-0.5">Responsible</div>
+                  <div className="font-medium">{singleTask.responsible_user_name || '—'}</div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-0.5">Crew</div>
+                  <div className="font-medium">{singleTask.crew?.length || 0} members</div>
+                </div>
+                {singleTask.estimate_hours && (
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-xs text-gray-500 mb-0.5">Estimate</div>
+                    <div className="font-medium">{singleTask.estimate_hours}h</div>
+                  </div>
+                )}
+                {singleTask.actual_hours && (
+                  <div className="bg-green-50 rounded-xl p-3">
+                    <div className="text-xs text-gray-500 mb-0.5">Actual Hours</div>
+                    <div className="font-medium text-green-700">{singleTask.actual_hours}h</div>
+                  </div>
+                )}
+                {singleTask.completed_at && (
+                  <div className="bg-green-50 rounded-xl p-3">
+                    <div className="text-xs text-gray-500 mb-0.5">Completed</div>
+                    <div className="font-medium text-green-700">{new Date(singleTask.completed_at).toLocaleDateString()}</div>
+                  </div>
+                )}
+              </div>
+              {singleTask.crew?.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Crew</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {singleTask.crew.map((c: any) => (
+                      <span key={c.id} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100">{c.name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {singleTask.planning_notes && (
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs font-medium text-gray-500 mb-1">Planning Notes</div>
+                  <p className="text-sm text-gray-700">{singleTask.planning_notes}</p>
+                </div>
+              )}
+              {singleTask.work_description && (
+                <div className="bg-green-50 rounded-xl p-3">
+                  <div className="text-xs font-medium text-gray-500 mb-1">Work Done</div>
+                  <p className="text-sm text-gray-700">{singleTask.work_description}</p>
+                </div>
+              )}
+              {singleTask.problems && (
+                <div className="bg-orange-50 rounded-xl p-3">
+                  <div className="text-xs font-medium text-orange-700 mb-1">Problems</div>
+                  <p className="text-sm text-orange-700">{singleTask.problems}</p>
+                </div>
+              )}
+              {historyTasks.length > 0 && (
+                <button onClick={() => setShowHistory(h => !h)}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline">
+                  {showHistory ? 'Hide history' : `Show history (${historyTasks.length} past instance${historyTasks.length !== 1 ? 's' : ''})`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        /* Recurring: show list of instances */
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">
+              {activeTasks.length} active · {historyTasks.length} historical
+            </span>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)}
+                className="w-3.5 h-3.5 rounded text-blue-600" />
+              <span className="text-xs text-gray-600">Show history</span>
+            </label>
+          </div>
+
+          {allTasks.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No scheduled instances found.</div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {allTasks.map(st => {
+                const isPast = st.scheduled_date && st.scheduled_date < new Date().toISOString().slice(0, 10);
+                return (
+                  <div key={st.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border ${
+                      st.state === 'completed' ? 'bg-green-50 border-green-100' :
+                      st.state === 'pending' && isPast ? 'bg-red-50 border-red-100' :
+                      st.state === 'pending' ? 'bg-white border-gray-200' :
+                      st.state === 'planned' ? 'bg-purple-50 border-purple-100' :
+                      'bg-gray-50 border-gray-100'
+                    }`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-sm font-medium text-gray-900">
+                          {st.scheduled_date
+                            ? new Date(st.scheduled_date + 'T00:00:00').toLocaleDateString()
+                            : '—'}
+                        </span>
+                        {st.state === 'pending' && isPast && (
+                          <span className="text-xs text-red-600 font-medium">Overdue</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                        {st.responsible_user_name && <span>👤 {st.responsible_user_name}</span>}
+                        {(st.crew?.length > 0) && <span>👥 {st.crew.length} crew</span>}
+                        {st.actual_hours && <span>⏱ {st.actual_hours}h actual</span>}
+                        {st.notes?.length > 0 && <span>💬 {st.notes.length} note{st.notes.length !== 1 ? 's' : ''}</span>}
+                      </div>
+                      {st.work_description && (
+                        <p className="text-xs text-gray-600 mt-1 truncate">{st.work_description}</p>
+                      )}
+                    </div>
+                    <StateBadge state={st.state} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }
