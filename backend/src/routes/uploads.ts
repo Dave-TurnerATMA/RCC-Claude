@@ -15,13 +15,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-router.post('/teams/:teamId/scheduled-tasks/:taskId/uploads', upload.single('file'), (req, res) => {
+router.post('/uploads/:scheduledTaskId', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const { user_id } = req.body;
-  const id = db.prepare('INSERT INTO task_uploads (scheduled_task_id, user_id, file_name, file_path, file_type) VALUES (?, ?, ?, ?, ?)').run(
-    req.params.taskId, user_id, req.file.originalname, `/uploads/${req.file.filename}`, req.file.mimetype
-  ).lastInsertRowid;
-  res.json({ id, file_name: req.file.originalname, file_path: `/uploads/${req.file.filename}`, file_type: req.file.mimetype });
+  const id = db.prepare(
+    'INSERT INTO task_uploads (scheduled_task_id, filename, original_name, mime_type, size) VALUES (?, ?, ?, ?, ?)'
+  ).run(req.params.scheduledTaskId, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size).lastInsertRowid;
+  res.json({ id, filename: req.file.filename, original_name: req.file.originalname, url: `/uploads/${req.file.filename}` });
 });
 
 export default router;

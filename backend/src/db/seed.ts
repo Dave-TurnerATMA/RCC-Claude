@@ -1,383 +1,791 @@
-import db, { initializeDatabase } from './database';
+import db from './database';
 
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
-function dateStr(date: Date): string {
-  return date.toISOString().split('T')[0];
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function pastDate(daysAgo: number): string {
-  return dateStr(addDays(new Date(), -daysAgo));
+  return addDays(today(), -daysAgo);
 }
 
 function futureDate(daysAhead: number): string {
-  return dateStr(addDays(new Date(), daysAhead));
+  return addDays(today(), daysAhead);
 }
 
 export function seedDatabase() {
-  initializeDatabase();
-
   const existingTeams = db.prepare('SELECT COUNT(*) as count FROM teams').get() as { count: number };
   if (existingTeams.count > 0) {
     console.log('Database already seeded, skipping...');
     return;
   }
 
-  console.log('Seeding database with Indonesian village disaster preparedness data...');
+  console.log('Seeding database...');
 
-  const team1Id = db.prepare('INSERT INTO teams (name, code) VALUES (?, ?)').run('Desa Suka Maju', 'desa-suka-maju').lastInsertRowid as number;
-  const team2Id = db.prepare('INSERT INTO teams (name, code) VALUES (?, ?)').run('Desa Harapan Baru', 'desa-harapan-baru').lastInsertRowid as number;
+  // Teams
+  const team1Id = db.prepare('INSERT INTO teams (name) VALUES (?)').run('Desa Suka Maju').lastInsertRowid as number;
+  const team2Id = db.prepare('INSERT INTO teams (name) VALUES (?)').run('Desa Harapan Baru').lastInsertRowid as number;
 
   // Users Team 1
-  const insertUser = db.prepare('INSERT INTO users (team_id, name, email, role, language) VALUES (?, ?, ?, ?, ?)');
-
-  const daveId = insertUser.run(team1Id, 'Dave Turner', 'davet.home@gmail.com', 'administrator', 'en').lastInsertRowid as number;
-  const budiId = insertUser.run(team1Id, 'Budi Santoso', 'budi.santoso@example.com', 'team_lead', 'id').lastInsertRowid as number;
-  const sitiId = insertUser.run(team1Id, 'Siti Rahayu', 'siti.rahayu@example.com', 'team_lead', 'id').lastInsertRowid as number;
-  const ahmadId = insertUser.run(team1Id, 'Ahmad Wijaya', 'ahmad.wijaya@example.com', 'team_member', 'id').lastInsertRowid as number;
-  const dewiId = insertUser.run(team1Id, 'Dewi Kusuma', 'dewi.kusuma@example.com', 'team_member', 'id').lastInsertRowid as number;
-  const ekoId = insertUser.run(team1Id, 'Eko Prasetyo', 'eko.prasetyo@example.com', 'team_member', 'id').lastInsertRowid as number;
-  const fitriId = insertUser.run(team1Id, 'Fitri Handayani', 'fitri.handayani@example.com', 'team_member', 'id').lastInsertRowid as number;
-  const gunawanId = insertUser.run(team1Id, 'Gunawan Kusuma', 'gunawan.kusuma@example.com', 'team_member', 'id').lastInsertRowid as number;
+  const insertUser = db.prepare('INSERT INTO users (team_id, name, email, role, status, language) VALUES (?, ?, ?, ?, ?, ?)');
+  const daveId = insertUser.run(team1Id, 'Dave Turner', 'davet.home@gmail.com', 'administrator', 'active', 'en').lastInsertRowid as number;
+  const budiId = insertUser.run(team1Id, 'Budi Santoso', 'budi@example.com', 'team_lead', 'active', 'id').lastInsertRowid as number;
+  const sitiId = insertUser.run(team1Id, 'Siti Rahayu', 'siti@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
+  const ahmadId = insertUser.run(team1Id, 'Ahmad Fauzi', 'ahmad@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
+  const dewiId = insertUser.run(team1Id, 'Dewi Kusuma', 'dewi@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
+  const hendraId = insertUser.run(team1Id, 'Hendra Wijaya', 'hendra@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
+  const rinaId = insertUser.run(team1Id, 'Rina Wulandari', 'rina@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
+  const jokoId = insertUser.run(team1Id, 'Joko Purnomo', 'joko@example.com', 'team_member', 'active', 'id').lastInsertRowid as number;
 
   // Users Team 2
-  insertUser.run(team2Id, 'Carlos Mendoza', 'carlos.mendoza@example.com', 'administrator', 'es');
-  insertUser.run(team2Id, 'Maria Santos', 'maria.santos@example.com', 'team_lead', 'es');
-  insertUser.run(team2Id, 'Juan Reyes', 'juan.reyes@example.com', 'team_member', 'es');
+  insertUser.run(team2Id, 'Admin User', 'admin2@example.com', 'administrator', 'active', 'en');
+  insertUser.run(team2Id, 'Member User', 'member2@example.com', 'team_member', 'active', 'id');
 
-  // Equipment
+  // Equipment Team 1
   const insertEq = db.prepare('INSERT INTO equipment (team_id, name_en, name_es, name_id) VALUES (?, ?, ?, ?)');
-  const firstAidId = insertEq.run(team1Id, 'First Aid Kit', 'Botiquín de Primeros Auxilios', 'Kotak P3K').lastInsertRowid as number;
-  const megaphoneId = insertEq.run(team1Id, 'Megaphone', 'Megáfono', 'Megafon').lastInsertRowid as number;
-  const lifeJacketsId = insertEq.run(team1Id, 'Life Jackets', 'Chalecos Salvavidas', 'Pelampung').lastInsertRowid as number;
-  const flashlightsId = insertEq.run(team1Id, 'Emergency Flashlights', 'Linternas de Emergencia', 'Senter Darurat').lastInsertRowid as number;
-  const radioId = insertEq.run(team1Id, 'Emergency Radio', 'Radio de Emergencia', 'Radio Darurat').lastInsertRowid as number;
+  const foodId = insertEq.run(team1Id, 'Emergency food supplies', 'Suministros de alimentos de emergencia', 'Persediaan makanan darurat').lastInsertRowid as number;
+  const waterId = insertEq.run(team1Id, 'Water purification tablets', 'Tabletas purificadoras de agua', 'Tablet pemurnian air').lastInsertRowid as number;
+  const firstAidId = insertEq.run(team1Id, 'First aid kit', 'Botiquín de primeros auxilios', 'Kotak P3K').lastInsertRowid as number;
+  const radioId = insertEq.run(team1Id, 'Emergency radio', 'Radio de emergencia', 'Radio darurat').lastInsertRowid as number;
+  const flashlightId = insertEq.run(team1Id, 'Flashlights and batteries', 'Linternas y baterías', 'Senter dan baterai').lastInsertRowid as number;
   const ropeId = insertEq.run(team1Id, 'Rope (50m)', 'Cuerda (50m)', 'Tali (50m)').lastInsertRowid as number;
-  const chainsawId = insertEq.run(team1Id, 'Chainsaw', 'Motosierra', 'Gergaji Mesin').lastInsertRowid as number;
-  const sandbagsId = insertEq.run(team1Id, 'Sandbags (50 units)', 'Sacos de Arena (50 unidades)', 'Karung Pasir (50 buah)').lastInsertRowid as number;
-  const pumpId = insertEq.run(team1Id, 'Water Pump', 'Bomba de Agua', 'Pompa Air').lastInsertRowid as number;
+  const lifeJacketId = insertEq.run(team1Id, 'Life jackets', 'Chalecos salvavidas', 'Jaket pelampung').lastInsertRowid as number;
+  const sandbagId = insertEq.run(team1Id, 'Sandbags', 'Sacos de arena', 'Kantong pasir').lastInsertRowid as number;
+  const shovelId = insertEq.run(team1Id, 'Shovels', 'Palas', 'Sekop').lastInsertRowid as number;
+  const megaphoneId = insertEq.run(team1Id, 'Megaphone', 'Megáfono', 'Megafon').lastInsertRowid as number;
+  const stretcherId = insertEq.run(team1Id, 'First aid stretcher', 'Camilla de primeros auxilios', 'Tandu P3K').lastInsertRowid as number;
+  const fireExtId = insertEq.run(team1Id, 'Fire extinguishers', 'Extintores de incendios', 'APAR').lastInsertRowid as number;
+  const blanketId = insertEq.run(team1Id, 'Emergency blankets', 'Mantas de emergencia', 'Selimut darurat').lastInsertRowid as number;
+  const chainsawId = insertEq.run(team1Id, 'Chainsaw', 'Motosierra', 'Gergaji mesin').lastInsertRowid as number;
   const generatorId = insertEq.run(team1Id, 'Generator', 'Generador', 'Generator').lastInsertRowid as number;
-  const foodId = insertEq.run(team1Id, 'Emergency Food Supplies', 'Suministros Alimentarios de Emergencia', 'Persediaan Makanan Darurat').lastInsertRowid as number;
-  const waterContainersId = insertEq.run(team1Id, 'Water Containers (200L)', 'Contenedores de Agua (200L)', 'Wadah Air (200L)').lastInsertRowid as number;
-  const shovelsId = insertEq.run(team1Id, 'Shovels', 'Palas', 'Sekop').lastInsertRowid as number;
-  const fireExtId = insertEq.run(team1Id, 'Fire Extinguisher', 'Extintor de Incendios', 'Alat Pemadam Api').lastInsertRowid as number;
-  const stretcherId = insertEq.run(team1Id, 'Emergency Stretcher', 'Camilla de Emergencia', 'Tandu Darurat').lastInsertRowid as number;
-  const glovesId = insertEq.run(team1Id, 'Protective Gloves', 'Guantes Protectores', 'Sarung Tangan Pelindung').lastInsertRowid as number;
-  const helmetsId = insertEq.run(team1Id, 'Safety Helmets', 'Cascos de Seguridad', 'Helm Keselamatan').lastInsertRowid as number;
-  const tarpaulinId = insertEq.run(team1Id, 'Waterproof Tarpaulin', 'Lona Impermeable', 'Terpal Tahan Air').lastInsertRowid as number;
-  const walkieTalkieId = insertEq.run(team1Id, 'Walkie-Talkies', 'Walkie-Talkies', 'Walkie-Talkie').lastInsertRowid as number;
-  const waterFilterId = insertEq.run(team1Id, 'Portable Water Filter', 'Filtro de Agua Portátil', 'Filter Air Portabel').lastInsertRowid as number;
 
-  // Required Tasks
+  // Required Task Categories Team 1
+  const insertCat = db.prepare('INSERT INTO required_task_categories (team_id, name, display_order) VALUES (?, ?, ?)');
+  const floodCatId = insertCat.run(team1Id, 'Flood Preparedness', 1).lastInsertRowid as number;
+  const fireCatId = insertCat.run(team1Id, 'Fire Safety', 2).lastInsertRowid as number;
+  const quakeCatId = insertCat.run(team1Id, 'Earthquake Readiness', 3).lastInsertRowid as number;
+
   const insertRT = db.prepare(`
-    INSERT INTO required_tasks (team_id, short_description, overview, priority, first_scheduled_date, frequency_days, default_responsible_user_id, estimate_hours, planned_instances)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO required_tasks (team_id, category_id, short_description, overview, priority, is_recurring,
+      scheduled_date, default_responsible_user_id, estimate_hours, task_overview, frequency_days,
+      planned_instances, top_tips, origin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
   `);
 
-  const requiredTasks = [
-    {
-      desc: 'Monthly Flood Evacuation Route Inspection',
-      overview: 'Inspect all designated flood evacuation routes in the village to ensure they are clear, accessible, and properly marked. Check all signage, bridges, and assembly points. Document any obstacles or damage found and arrange for repairs.',
-      priority: 'urgent', freq: 30, resp: budiId, est: 3, planned: 3,
-      firstDate: pastDate(90),
-      equipment: [megaphoneId, flashlightsId, walkieTalkieId],
-      crew: [budiId, ahmadId, ekoId],
-    },
-    {
-      desc: 'Emergency Food Stock Quarterly Check',
-      overview: 'Conduct a thorough inventory of all emergency food and water supplies stored in the village emergency depot. Check expiry dates, quantity, and quality. Replace expired items and replenish stocks that are below minimum levels for a 72-hour emergency.',
-      priority: 'high', freq: 90, resp: sitiId, est: 4, planned: 2,
-      firstDate: pastDate(120),
-      equipment: [foodId, waterContainersId, waterFilterId],
-      crew: [sitiId, dewiId, fitriId],
-    },
-    {
-      desc: 'Monthly First Aid Kit Inventory',
-      overview: 'Check all first aid kits stored throughout the village including the community hall, school, mosque, and medical post. Verify completeness, check expiry dates of medicines and supplies. Replace any expired or used items.',
-      priority: 'high', freq: 30, resp: dewiId, est: 2, planned: 3,
-      firstDate: pastDate(75),
-      equipment: [firstAidId, glovesId],
-      crew: [dewiId, fitriId],
-    },
-    {
-      desc: 'Semi-Annual Community Shelter Inspection',
-      overview: 'Inspect the primary community disaster shelter (community hall) for structural integrity, cleanliness, and readiness. Check roof, walls, ventilation, sanitation facilities, emergency lighting, and capacity. Document findings and arrange for necessary repairs.',
-      priority: 'high', freq: 180, resp: budiId, est: 5, planned: 2,
-      firstDate: pastDate(180),
-      equipment: [flashlightsId, helmetsId],
-      crew: [budiId, gunawanId, ahmadId],
-    },
-    {
-      desc: 'Monthly Emergency Communication Test',
-      overview: 'Test all emergency communication systems including the emergency radio network, phone tree, village alarm system, and walkie-talkie network. Contact all team members and verify response times. Document any communication failures for follow-up.',
-      priority: 'urgent', freq: 30, resp: budiId, est: 2, planned: 3,
-      firstDate: pastDate(60),
-      equipment: [radioId, walkieTalkieId, megaphoneId],
-      crew: [budiId, sitiId, ahmadId, ekoId],
-    },
-    {
-      desc: 'Quarterly Water Pump Maintenance',
-      overview: 'Perform maintenance on all emergency water pumps. Clean filters, check fuel levels, test operation, lubricate moving parts, and ensure all hoses and connections are in good condition. Replace any worn parts and update the maintenance log.',
-      priority: 'medium', freq: 90, resp: ekoId, est: 4, planned: 2,
-      firstDate: pastDate(100),
-      equipment: [pumpId, glovesId],
-      crew: [ekoId, gunawanId],
-    },
-    {
-      desc: 'Monthly Firebreak Maintenance',
-      overview: 'Clear and maintain firebreak lines around the village perimeter. Remove dry brush, dead trees, and debris that could fuel a fire. Ensure firebreaks are at least 10 meters wide. Document areas that need further attention.',
-      priority: 'high', freq: 30, resp: gunawanId, est: 8, planned: 3,
-      firstDate: pastDate(45),
-      equipment: [chainsawId, shovelsId, glovesId, helmetsId, fireExtId],
-      crew: [gunawanId, ahmadId, ekoId],
-    },
-    {
-      desc: 'Semi-Annual Emergency Contact List Update',
-      overview: 'Update the village emergency contact list. Verify phone numbers for all team members, local government emergency contacts, hospitals, fire department, and the district disaster management agency (BPBD). Distribute updated lists to all households.',
-      priority: 'medium', freq: 180, resp: sitiId, est: 2, planned: 2,
-      firstDate: pastDate(150),
-      equipment: [],
-      crew: [sitiId],
-    },
-    {
-      desc: 'Monthly Earthquake Preparedness Drill',
-      overview: 'Conduct earthquake preparedness drill with village residents. Practice drop, cover, and hold on procedures. Practice evacuation to designated assembly points. Test the communication chain. Provide immediate feedback to participants on their performance.',
-      priority: 'high', freq: 30, resp: budiId, est: 3, planned: 3,
-      firstDate: pastDate(30),
-      equipment: [megaphoneId, walkieTalkieId, firstAidId],
-      crew: [budiId, sitiId, dewiId, ahmadId],
-    },
-    {
-      desc: 'Quarterly Generator Maintenance',
-      overview: 'Perform full maintenance on the emergency generator. Check oil levels, fuel, coolant, battery, and belts. Run a test under load for at least 30 minutes. Clean the air filter. Check and tighten all connections. Update the maintenance log.',
-      priority: 'medium', freq: 90, resp: ekoId, est: 3, planned: 2,
-      firstDate: pastDate(110),
-      equipment: [generatorId, glovesId],
-      crew: [ekoId],
-    },
-    {
-      desc: 'Monthly Flood Early Warning System Check',
-      overview: 'Test and verify all flood early warning system components including river level sensors, alarm sirens, and notification systems. Calibrate sensors if needed. Ensure backup power for all monitoring equipment is fully charged.',
-      priority: 'urgent', freq: 30, resp: budiId, est: 2, planned: 3,
-      firstDate: pastDate(55),
-      equipment: [radioId, walkieTalkieId],
-      crew: [budiId, ekoId],
-    },
-    {
-      desc: 'Quarterly Life Jacket and Rescue Equipment Check',
-      overview: 'Inspect all life jackets, ropes, and water rescue equipment stored in the emergency depot. Check for damage, wear, and proper inflation of life jackets. Ensure all equipment is properly stored and accessible. Replace any damaged items.',
-      priority: 'high', freq: 90, resp: ahmadId, est: 3, planned: 2,
-      firstDate: pastDate(80),
-      equipment: [lifeJacketsId, ropeId, stretcherId],
-      crew: [ahmadId, gunawanId],
-    },
-  ];
+  // --- FLOOD PREPAREDNESS ---
 
-  interface HistoryNote {
-    work: string;
-    problems: string;
-    actual_hours: number;
-    crew: number[];
+  // RT1: Monthly Flood Risk Assessment
+  const rt1Id = insertRT.run(
+    team1Id, floodCatId,
+    'Monthly Flood Risk Assessment',
+    'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    'high', 1,
+    pastDate(20),
+    budiId, 3,
+    'Walk the perimeter of the flood-prone areas with a checklist. Document water levels in the monitoring wells. Check all drainage channels for blockages.',
+    30, 2,
+    'Always bring the village map. Check wells after rainfall. Note any new construction that may affect drainage.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt1Id, budiId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt1Id, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt1Id, ropeId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt1Id, megaphoneId);
+
+  // RT2: Flood Evacuation Route Inspection
+  const rt2Id = insertRT.run(
+    team1Id, floodCatId,
+    'Flood Evacuation Route Inspection',
+    'Inspect all designated evacuation routes to ensure they are passable and clearly marked.',
+    'urgent', 1,
+    pastDate(45),
+    budiId, 4,
+    'Walk each of the 3 main evacuation routes. Check signage, bridge conditions, and accessibility for elderly and disabled residents.',
+    60, 2,
+    'Bring a vehicle if possible to test route passability. Check culverts after heavy rain. Update the community map with any route changes.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt2Id, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt2Id, ropeId);
+
+  // RT3: Emergency Food & Water Stock Check
+  const rt3Id = insertRT.run(
+    team1Id, floodCatId,
+    'Emergency Food & Water Stock Check',
+    'Check and rotate emergency food and water supplies stored at the village hall.',
+    'high', 1,
+    pastDate(10),
+    null, 2,
+    'Count all stock items. Check expiry dates. Update the inventory log. Replenish any items that are expired or below minimum levels.',
+    14, 3,
+    'Always check expiry dates first. Rotate stock FIFO. Keep at least 3 days supply for 50 families.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt3Id, foodId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt3Id, waterId);
+
+  // RT4: Community Flood Warning Drill
+  const rt4Id = insertRT.run(
+    team1Id, floodCatId,
+    'Community Flood Warning Drill',
+    'Conduct a community drill to practice flood evacuation procedures.',
+    'high', 1,
+    pastDate(80),
+    null, 6,
+    'Notify all households 3 days in advance. Assemble at the designated meeting points. Practice evacuation routes. Debrief after completion.',
+    90, 2,
+    'Run the drill at different times to catch people at different activities. Always debrief with community leaders after.'
+  ).lastInsertRowid as number;
+  // crew: all 6 non-admin users
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt4Id, uid);
+  }
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt4Id, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt4Id, lifeJacketId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt4Id, radioId);
+
+  // --- FIRE SAFETY ---
+
+  // RT5: Fire Extinguisher Inspection
+  const rt5Id = insertRT.run(
+    team1Id, fireCatId,
+    'Fire Extinguisher Inspection',
+    'Inspect all fire extinguishers in public buildings and ensure they are functional.',
+    'high', 1,
+    pastDate(25),
+    null, 2,
+    'Check pressure gauge on each extinguisher. Verify seals are intact. Check expiry dates. Record locations and condition in the fire safety log.',
+    30, 2,
+    'Check the pressure gauge first — if in red zone, arrange replacement immediately. Never skip any building even if it looks recently checked.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt5Id, fireExtId);
+
+  // RT6: Community Fire Safety Education (one-off, no scheduled_date)
+  const rt6Id = insertRT.run(
+    team1Id, fireCatId,
+    'Community Fire Safety Education',
+    'Deliver fire safety education to community members focusing on cooking fire prevention.',
+    'medium', 0,
+    null,
+    null, 4,
+    null, null, 2, null
+  ).lastInsertRowid as number;
+
+  // RT7: Fire Hazard Assessment
+  const rt7Id = insertRT.run(
+    team1Id, fireCatId,
+    'Fire Hazard Assessment',
+    'Identify and document fire hazards throughout the village.',
+    'high', 1,
+    pastDate(40),
+    hendraId, 3,
+    'Walk all streets and check for improper waste disposal near buildings, overloaded electrical wiring, and unsafe cooking practices.',
+    45, 2,
+    'Check the market area carefully — it has the highest fire risk. Talk to residents about their cooking practices.'
+  ).lastInsertRowid as number;
+
+  // --- EARTHQUAKE READINESS ---
+
+  // RT8: Building Safety Inspection (one-off, future)
+  const rt8Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Building Safety Inspection',
+    'Assess structural safety of key village buildings including the hall, school, and health clinic.',
+    'urgent', 0,
+    futureDate(5),
+    null, 8,
+    'Use the structural assessment checklist. Look for cracks, foundation issues, and non-compliant extensions.',
+    null, 2, null
+  ).lastInsertRowid as number;
+
+  // RT9: Earthquake Emergency Kit Check
+  const rt9Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Earthquake Emergency Kit Check',
+    'Verify all emergency kits are complete, accessible, and ready for earthquake emergency response.',
+    'high', 1,
+    pastDate(50),
+    null, 2,
+    'Check each kit location. Verify contents match the required list. Replace any expired items.',
+    60, 2,
+    'Check the kits in the storage room first — they are hardest to access. Keep a log of what was replaced and when.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt9Id, firstAidId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt9Id, blanketId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt9Id, flashlightId);
+
+  // RT10: Community Earthquake Response Training
+  const rt10Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Community Earthquake Response Training',
+    'Train community members in earthquake response procedures including drop-cover-hold and post-earthquake safety checks.',
+    'high', 1,
+    pastDate(150),
+    null, 8,
+    'Book the village hall. Prepare training materials. Conduct morning theory session and afternoon practical.',
+    180, 1,
+    'Invite the local BPBD officer to co-facilitate. Practice with elderly and children separately.'
+  ).lastInsertRowid as number;
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt10Id, uid);
   }
 
-  function createHistory(rtId: number, rt: typeof requiredTasks[0], pastInstances: number, notes: HistoryNote[]) {
-    const today = new Date();
-    let currentDate = new Date(rt.firstDate + 'T00:00:00Z');
-    let instanceNum = 1;
+  // RT11: Emergency Communication Tree Test
+  const rt11Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Emergency Communication Tree Test',
+    'Test the village emergency communication chain to ensure all household leaders can be reached within 15 minutes.',
+    'medium', 1,
+    pastDate(28),
+    null, 1,
+    'Start the chain at 8am. Time how long it takes to reach each tier of the communication tree. Record who did not respond.',
+    30, 3, null
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt11Id, radioId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt11Id, megaphoneId);
 
-    const insertST = db.prepare(`
-      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, actual_hours, state, completed_at, work_description, problems, feedback_notes, instance_number)
-      VALUES (?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+  // RT12: Search & Rescue Team Practice
+  const rt12Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Search & Rescue Team Practice',
+    'Practice search and rescue techniques for locating and extracting trapped survivors after earthquake or building collapse.',
+    'high', 1,
+    pastDate(42),
+    null, 5,
+    'Set up simulated rescue scenarios. Practice using ropes and stretchers. Rotate team roles.',
+    45, 2,
+    'Always have a safety officer present. Practice communication between rescuers especially with the radio.'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt12Id, budiId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt12Id, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt12Id, hendraId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, ropeId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, stretcherId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, firstAidId);
 
-    for (let i = 0; i < pastInstances; i++) {
-      const note = notes[i % notes.length];
-      const scheduledDate = dateStr(currentDate);
-      const isCompleted = currentDate < today;
-      const state = isCompleted ? 'completed' : 'pending';
-      const completedAt = isCompleted ? new Date(currentDate.getTime() + 4 * 3600000).toISOString() : null;
-
-      const taskId = insertST.run(
-        team1Id, rtId, rt.desc, rt.overview, scheduledDate, rt.priority, rt.resp,
-        rt.est, isCompleted ? note.actual_hours : null,
-        state, completedAt, isCompleted ? note.work : null, isCompleted ? note.problems : null,
-        isCompleted ? 'Task completed as scheduled.' : null, instanceNum
-      ).lastInsertRowid as number;
-
-      const crewToAdd = isCompleted ? note.crew : rt.crew;
-      for (const uid of crewToAdd) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(taskId, uid);
-      for (const eqId of rt.equipment) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(taskId, eqId);
-
-      currentDate = addDays(currentDate, rt.freq);
-      instanceNum++;
-    }
-
-    // Pending instance
-    const pendingDate = dateStr(currentDate);
-    const pendingId = db.prepare(`
-      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state, instance_number)
-      VALUES (?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, 'pending', ?)
-    `).run(team1Id, rtId, rt.desc, rt.overview, pendingDate, rt.priority, rt.resp, rt.est, instanceNum).lastInsertRowid as number;
-    for (const uid of rt.crew) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(pendingId, uid);
-    for (const eqId of rt.equipment) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(pendingId, eqId);
-    currentDate = addDays(currentDate, rt.freq);
-    instanceNum++;
-
-    // Planned instances
-    for (let i = 0; i < rt.planned; i++) {
-      const plannedDate = dateStr(currentDate);
-      const plannedId = db.prepare(`
-        INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state, instance_number)
-        VALUES (?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, 'planned', ?)
-      `).run(team1Id, rtId, rt.desc, rt.overview, plannedDate, rt.priority, rt.resp, rt.est, instanceNum).lastInsertRowid as number;
-      for (const uid of rt.crew) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(plannedId, uid);
-      for (const eqId of rt.equipment) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(plannedId, eqId);
-      currentDate = addDays(currentDate, rt.freq);
-      instanceNum++;
-    }
+  // ---- SCHEDULED TASKS ----
+  // Helper to create a scheduled task and return its id
+  function createST(data: {
+    teamId: number;
+    requiredTaskId: number | null;
+    type: string;
+    desc: string;
+    overview: string;
+    scheduledDate: string | null;
+    priority: string;
+    state: string;
+    responsibleId: number | null;
+    estimateHours: number | null;
+    actualHours?: number | null;
+    workDescription?: string | null;
+    problems?: string | null;
+    completedAt?: string | null;
+    planningNotes?: string | null;
+  }): number {
+    return db.prepare(`
+      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview,
+        scheduled_date, priority, state, responsible_user_id, estimate_hours, actual_hours,
+        work_description, problems, completed_at, planning_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.teamId, data.requiredTaskId, data.type, data.desc, data.overview,
+      data.scheduledDate, data.priority, data.state, data.responsibleId,
+      data.estimateHours, data.actualHours ?? null,
+      data.workDescription ?? null, data.problems ?? null,
+      data.completedAt ?? null, data.planningNotes ?? null
+    ).lastInsertRowid as number;
   }
 
-  // Create required tasks and history
-  const rtHistories: HistoryNote[][] = [
-    // 0: Flood Route
-    [
-      { work: 'Completed full inspection of all 4 evacuation routes. All signs are in good condition. Bridge at Jalan Melati requires minor repair - one handrail is loose.', problems: 'Handrail on Melati bridge is loose and needs repair. Contacted public works department.', actual_hours: 3.5, crew: [budiId, ahmadId, ekoId] },
-      { work: 'Conducted thorough inspection. Found debris blocking Route 3 near river bend. Cleared the debris with team. All signage checked and 2 faded signs replaced.', problems: 'Large fallen tree blocking Route 3. Required chainsaw to clear. Coordinated with Pak Eko for equipment.', actual_hours: 4, crew: [budiId, ahmadId, gunawanId] },
-      { work: 'All routes clear and accessible. Replaced 3 faded evacuation signs. Assembly points all marked clearly. Added reflective tape to night visibility markers.', problems: 'Some minor vegetation growth along Route 2 edges. Trimmed back by team.', actual_hours: 2.5, crew: [budiId, ekoId] },
-    ],
-    // 1: Food Stock
-    [
-      { work: 'Completed full inventory. Found 15 items past expiry date. Replaced all expired items. Total stock now meets 72-hour requirement for 200 people. Organized storage system.', problems: '15 canned goods expired. Water purification tablets running low - only 30% of recommended stock. Placed order for replacement stock.', actual_hours: 5, crew: [sitiId, dewiId, fitriId] },
-    ],
-    // 2: First Aid
-    [
-      { work: 'Checked all 6 first aid kits. 3 kits needed restocking. Replaced expired bandages and antiseptic. Added new tourniquet to each kit as per updated protocol.', problems: 'Kit at school was partially used and not reported to team. Spoke with school principal about protocol for reporting use.', actual_hours: 2, crew: [dewiId, fitriId] },
-      { work: 'All kits in good condition. Replaced latex gloves in 2 kits that showed signs of degradation. Tourniquets in proper condition. Documented all kit locations on map.', problems: 'No significant issues found. Suggested moving mosque kit to more accessible location.', actual_hours: 1.5, crew: [dewiId] },
-      { work: 'Full kit inspection completed. Added new CPR face shields to all kits per new national standard. Updated inventory records.', problems: 'Two kits at mosque had water damage on inside of case. Cases replaced immediately. Investigating cause of water ingress.', actual_hours: 2.5, crew: [dewiId, fitriId] },
-    ],
-    // 3: Shelter
-    [
-      { work: 'Complete structural inspection done. Roof is solid. Installed 4 new emergency lights. Cleaned sanitation facilities thoroughly. Updated capacity signs.', problems: 'Roof tiles in south section showing wear and need attention before rainy season. Several windows have cracked seals allowing moisture in. Submitted maintenance request to village head.', actual_hours: 6, crew: [budiId, gunawanId, ahmadId] },
-    ],
-    // 4: Communication
-    [
-      { work: 'Full communication test completed. Phone tree activated - all 45 households contacted within 23 minutes. Radio network checked and all 8 units responding.', problems: 'Two households could not be reached by phone - numbers had changed. Updated contact list immediately. One radio battery weak.', actual_hours: 2, crew: [budiId, sitiId, ahmadId] },
-      { work: 'Emergency radio network tested with full drill. All 8 radios responding clearly. Alarm siren tested at 6am with prior community notice. Response time improved from last month.', problems: 'Siren at south end of village has intermittent issue - sometimes fails to activate. Reported to maintenance team for urgent repair.', actual_hours: 2.5, crew: [budiId, sitiId, ahmadId, ekoId] },
-    ],
-    // 5: Water Pump
-    [
-      { work: 'Full maintenance on both pumps completed. Replaced fuel filters on both units, checked all seals and hoses. Both pumps tested and running smoothly for 1 hour.', problems: 'Main pump had a worn impeller seal causing minor leak. Replaced seal. Fuel supply was at 40% - purchased additional 50L of diesel.', actual_hours: 4.5, crew: [ekoId, gunawanId] },
-    ],
-    // 6: Firebreak
-    [
-      { work: 'Cleared 2.3km of firebreak on north and east perimeter. Removed 3 dead trees that posed fire risk. Firebreak width maintained at 10-12m throughout.', problems: "One area near Pak Hasan's farm had encroachment by bamboo growth extending into firebreak. Owner agreed to keep it cleared going forward.", actual_hours: 9, crew: [gunawanId, ahmadId, ekoId] },
-    ],
-    // 7: Contact List
-    [
-      { work: 'Updated all emergency contacts. Verified 89 household contacts, 12 government emergency contacts, and 5 hospital numbers. Printed and distributed 50 updated copies to households.', problems: 'BPBD district coordinator changed position - had to verify new contact details. Found 8 outdated household phone numbers.', actual_hours: 2, crew: [sitiId] },
-    ],
-    // 8: Earthquake Drill
-    [
-      { work: 'Drill conducted with 78 participants including 15 children from the school. All assembly points reached within target time of 8 minutes. Evacuation routes practiced successfully.', problems: 'Elderly residents at south end of village took longer than target time to reach assembly point. Discussed setting up buddy system for vulnerable residents.', actual_hours: 3.5, crew: [budiId, sitiId, dewiId, ahmadId] },
-    ],
-    // 9: Generator
-    [
-      { work: 'Full maintenance completed. Changed oil and oil filter, checked spark plugs and air filter. Generator ran for 2 hours under test load without any issues.', problems: 'Battery showing signs of low charge - may need replacement in next quarter. Fuel tank was below 50% - topped up.', actual_hours: 3, crew: [ekoId] },
-    ],
-    // 10: Flood Warning
-    [
-      { work: 'Tested all flood sensors. River level sensors calibrated against reference gauge. All 3 alarm sirens tested successfully. Backup power batteries fully charged.', problems: 'Sensor 2 at main bridge was giving slightly inconsistent readings. Cleaned sensor housing and recalibrated. Problem resolved.', actual_hours: 2, crew: [budiId, ekoId] },
-      { work: 'Full system test conducted. All sensors responding within normal parameters. Test alarm activated for 30 seconds at 7am as per community notice.', problems: 'No issues found this month. System operating correctly. Community well-prepared after last month drill.', actual_hours: 1.5, crew: [budiId, ekoId] },
-    ],
-    // 11: Life Jackets
-    [
-      { work: 'Inspected all 25 life jackets. All properly inflated and in good condition. Ropes coiled correctly and properly stored. Stretchers cleaned and folded.', problems: '3 life jackets show wear on straps. Flagged for replacement in next quarter budget. All currently safe for use.', actual_hours: 3, crew: [ahmadId, gunawanId] },
-    ],
-  ];
+  // --- Historical completed tasks (2-4 months ago) ---
 
-  const rtIds: number[] = [];
-  for (let i = 0; i < requiredTasks.length; i++) {
-    const rt = requiredTasks[i];
-    const id = insertRT.run(team1Id, rt.desc, rt.overview, rt.priority, rt.firstDate, rt.freq, rt.resp, rt.est, rt.planned).lastInsertRowid as number;
-    rtIds.push(id);
-    for (const eqId of rt.equipment) db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(id, eqId);
-    for (const uid of rt.crew) db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(id, uid);
-    db.prepare('INSERT INTO required_task_logs (required_task_id, user_id, change_type, details) VALUES (?, ?, ?, ?)').run(id, daveId, 'created', 'Required task created during initial system setup');
-    createHistory(id, rt, rtHistories[i].length, rtHistories[i]);
+  // RT1 - Flood Risk Assessment historical completions
+  const hist1a = createST({
+    teamId: team1Id, requiredTaskId: rt1Id, type: 'recurring',
+    desc: 'Monthly Flood Risk Assessment', overview: 'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    scheduledDate: pastDate(80), priority: 'high', state: 'completed',
+    responsibleId: budiId, estimateHours: 3, actualHours: 3.5,
+    workDescription: 'Pemeriksaan selesai. Ditemukan 3 saluran air yang tersumbat di RT 02. Sudah dibersihkan. Level air sungai dalam batas normal.',
+    problems: 'Saluran air di RT 02 tersumbat oleh sampah. Sudah dibersihkan tetapi perlu monitoring rutin.',
+    completedAt: pastDate(80) + 'T10:30:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist1a, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist1a, ahmadId);
+
+  const hist1b = createST({
+    teamId: team1Id, requiredTaskId: rt1Id, type: 'recurring',
+    desc: 'Monthly Flood Risk Assessment', overview: 'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    scheduledDate: pastDate(50), priority: 'high', state: 'completed',
+    responsibleId: budiId, estimateHours: 3, actualHours: 2.5,
+    workDescription: 'Level air sungai meningkat 20cm dari bulan lalu akibat hujan deras. 45 rumah tangga rentan sudah diidentifikasi dan diberitahu.',
+    problems: 'Pompa air tidak berfungsi, perlu perbaikan segera. Sudah dilaporkan ke kepala desa.',
+    completedAt: pastDate(50) + 'T11:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist1b, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist1b, ahmadId);
+
+  // RT1 pending (current)
+  const rt1Pending = createST({
+    teamId: team1Id, requiredTaskId: rt1Id, type: 'recurring',
+    desc: 'Monthly Flood Risk Assessment', overview: 'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    scheduledDate: pastDate(20), priority: 'high', state: 'pending',
+    responsibleId: budiId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Pending, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Pending, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt1Pending, ropeId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt1Pending, megaphoneId);
+
+  // RT1 planned instances
+  const rt1Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt1Id, type: 'recurring',
+    desc: 'Monthly Flood Risk Assessment', overview: 'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    scheduledDate: futureDate(10), priority: 'high', state: 'planned',
+    responsibleId: budiId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Plan1, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Plan1, ahmadId);
+
+  const rt1Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt1Id, type: 'recurring',
+    desc: 'Monthly Flood Risk Assessment', overview: 'Assess flood risk in the village by checking river levels, drainage systems, and identifying vulnerable households.',
+    scheduledDate: futureDate(40), priority: 'high', state: 'planned',
+    responsibleId: budiId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Plan2, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt1Plan2, ahmadId);
+
+  // RT2 - Flood Evacuation Route Inspection historical
+  const hist2a = createST({
+    teamId: team1Id, requiredTaskId: rt2Id, type: 'recurring',
+    desc: 'Flood Evacuation Route Inspection', overview: 'Inspect all designated evacuation routes to ensure they are passable and clearly marked.',
+    scheduledDate: pastDate(105), priority: 'urgent', state: 'completed',
+    responsibleId: budiId, estimateHours: 4, actualHours: 5,
+    workDescription: 'Jalur evakuasi dalam kondisi baik. Rambu baru dipasang di persimpangan utama. Semua 3 jalur diperiksa dan dapat dilalui kendaraan.',
+    problems: 'Jembatan di Jalan Melati memerlukan perbaikan minor pada pegangan tangan. Sudah dilaporkan ke dinas PU.',
+    completedAt: pastDate(105) + 'T14:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist2a, budiId);
+
+  const rt2Pending = createST({
+    teamId: team1Id, requiredTaskId: rt2Id, type: 'recurring',
+    desc: 'Flood Evacuation Route Inspection', overview: 'Inspect all designated evacuation routes to ensure they are passable and clearly marked.',
+    scheduledDate: pastDate(45), priority: 'urgent', state: 'pending',
+    responsibleId: budiId, estimateHours: 4
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt2Pending, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt2Pending, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt2Pending, ropeId);
+
+  const rt2Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt2Id, type: 'recurring',
+    desc: 'Flood Evacuation Route Inspection', overview: 'Inspect all designated evacuation routes to ensure they are passable and clearly marked.',
+    scheduledDate: futureDate(15), priority: 'urgent', state: 'planned',
+    responsibleId: budiId, estimateHours: 4
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt2Plan1, budiId);
+
+  const rt2Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt2Id, type: 'recurring',
+    desc: 'Flood Evacuation Route Inspection', overview: 'Inspect all designated evacuation routes to ensure they are passable and clearly marked.',
+    scheduledDate: futureDate(75), priority: 'urgent', state: 'planned',
+    responsibleId: budiId, estimateHours: 4
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt2Plan2, budiId);
+
+  // RT3 - Food & Water Stock Check historical
+  const hist3a = createST({
+    teamId: team1Id, requiredTaskId: rt3Id, type: 'recurring',
+    desc: 'Emergency Food & Water Stock Check', overview: 'Check and rotate emergency food and water supplies stored at the village hall.',
+    scheduledDate: pastDate(38), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 2, actualHours: 2,
+    workDescription: 'Stok makanan lengkap. 5 kaleng makanan kadaluarsa diganti. Tablet pemurnian air cukup untuk 60 hari ke depan.',
+    problems: 'Tidak ada masalah signifikan.',
+    completedAt: pastDate(38) + 'T09:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist3a, sitiId);
+
+  const hist3b = createST({
+    teamId: team1Id, requiredTaskId: rt3Id, type: 'recurring',
+    desc: 'Emergency Food & Water Stock Check', overview: 'Check and rotate emergency food and water supplies stored at the village hall.',
+    scheduledDate: pastDate(24), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 2, actualHours: 1.5,
+    workDescription: 'Inventaris lengkap. Semua stok dalam kondisi baik. Rotasi FIFO diterapkan dengan benar.',
+    problems: '',
+    completedAt: pastDate(24) + 'T10:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist3b, dewiId);
+
+  const rt3Pending = createST({
+    teamId: team1Id, requiredTaskId: rt3Id, type: 'recurring',
+    desc: 'Emergency Food & Water Stock Check', overview: 'Check and rotate emergency food and water supplies stored at the village hall.',
+    scheduledDate: pastDate(10), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt3Pending, foodId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt3Pending, waterId);
+
+  // RT3 planned instances (3)
+  for (let i = 1; i <= 3; i++) {
+    const rt3Plan = createST({
+      teamId: team1Id, requiredTaskId: rt3Id, type: 'recurring',
+      desc: 'Emergency Food & Water Stock Check', overview: 'Check and rotate emergency food and water supplies stored at the village hall.',
+      scheduledDate: futureDate(14 * i - 10), priority: 'high', state: 'planned',
+      responsibleId: null, estimateHours: 2
+    });
+    db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt3Plan, foodId);
+    db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt3Plan, waterId);
   }
 
-  // One-off tasks
-  const oneOff1 = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state, planning_notes)
-    VALUES (?, 'one_off', ?, ?, ?, 'high', ?, ?, 'pending', ?)
-  `).run(team1Id,
-    'Flood Risk Area Mapping Update',
-    'Update the village flood risk map with latest data from BMKG (Meteorology Agency). Include new housing developments built in the last year and recent changes to drainage systems after road construction.',
-    futureDate(7), budiId, 4,
-    'Need to collect latest satellite imagery from BMKG website and coordinate with their local representative. Check with camat office for new building permits.'
-  ).lastInsertRowid as number;
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(oneOff1, budiId);
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(oneOff1, sitiId);
-  db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(oneOff1, daveId, 'Please coordinate with the camat office for official data access. They have digital records of new constructions.');
-  db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(oneOff1, sitiId, 'I have a contact at the BMKG office, will reach out to arrange a meeting this week.');
+  // RT4 - Community Flood Warning Drill historical
+  const hist4a = createST({
+    teamId: team1Id, requiredTaskId: rt4Id, type: 'recurring',
+    desc: 'Community Flood Warning Drill', overview: 'Conduct a community drill to practice flood evacuation procedures.',
+    scheduledDate: pastDate(170), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 6, actualHours: 7,
+    workDescription: 'Simulasi banjir dilaksanakan dengan 120 peserta. Semua rute evakuasi berhasil dilalui dalam waktu 12 menit. Anak-anak sekolah turut berpartisipasi.',
+    problems: 'Beberapa warga lanjut usia memerlukan bantuan lebih di jalur evakuasi. Perlu sistem pendampingan khusus.',
+    completedAt: pastDate(170) + 'T15:00:00.000Z'
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist4a, uid);
+  }
 
-  const oneOff2 = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state)
-    VALUES (?, 'one_off', ?, ?, ?, 'medium', ?, ?, 'pending')
-  `).run(team1Id,
-    'Basic First Aid Refresher Training',
-    'Organize and conduct a basic first aid refresher training session for all active team members. Cover CPR techniques, wound care, fracture management, and basic earthquake rescue procedures. Aim for full team participation.',
-    futureDate(14), dewiId, 6
-  ).lastInsertRowid as number;
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(oneOff2, dewiId);
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(oneOff2, fitriId);
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(oneOff2, ahmadId);
-  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(oneOff2, firstAidId);
-  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(oneOff2, stretcherId);
+  const rt4Pending = createST({
+    teamId: team1Id, requiredTaskId: rt4Id, type: 'recurring',
+    desc: 'Community Flood Warning Drill', overview: 'Conduct a community drill to practice flood evacuation procedures.',
+    scheduledDate: pastDate(80), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 6
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt4Pending, uid);
+  }
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt4Pending, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt4Pending, lifeJacketId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt4Pending, radioId);
 
-  // Follow-up task from shelter inspection
-  const followUp1 = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state, planning_notes)
-    VALUES (?, 'follow_up', ?, ?, ?, 'high', ?, ?, 'pending', ?)
-  `).run(team1Id,
-    'Repair Community Shelter Roof and Windows',
-    'Repair damaged and loose roof tiles on the south section of the community shelter as identified during the last inspection. Also replace cracked window seals on 3 windows to prevent water ingress during the upcoming rainy season.',
-    futureDate(5), gunawanId, 4,
-    'Materials needed: roof tiles approximately 20 units, silicone window sealant 3 tubes, safety ladder. Check with Pak Gunawan about material costs and sourcing.'
-  ).lastInsertRowid as number;
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(followUp1, gunawanId);
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(followUp1, ahmadId);
-  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(followUp1, helmetsId);
-  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(followUp1, glovesId);
+  const rt4Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt4Id, type: 'recurring',
+    desc: 'Community Flood Warning Drill', overview: 'Conduct a community drill to practice flood evacuation procedures.',
+    scheduledDate: futureDate(10), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 6
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt4Plan1, uid);
+  }
 
-  // Overdue task
-  const overdueTask = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, state)
-    VALUES (?, 'one_off', ?, ?, ?, 'urgent', ?, ?, 'pending')
-  `).run(team1Id,
-    'Replace Damaged Evacuation Sign - Route 2',
-    "The evacuation direction sign at the Jalan Mawar intersection was damaged in last week's storm and has fallen. Replace immediately as this is on the primary evacuation route to the high ground assembly point.",
-    pastDate(3), ahmadId, 1
-  ).lastInsertRowid as number;
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(overdueTask, ahmadId);
+  const rt4Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt4Id, type: 'recurring',
+    desc: 'Community Flood Warning Drill', overview: 'Conduct a community drill to practice flood evacuation procedures.',
+    scheduledDate: futureDate(100), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 6
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt4Plan2, uid);
+  }
+
+  // RT5 - Fire Extinguisher Inspection historical
+  const hist5a = createST({
+    teamId: team1Id, requiredTaskId: rt5Id, type: 'recurring',
+    desc: 'Fire Extinguisher Inspection', overview: 'Inspect all fire extinguishers in public buildings and ensure they are functional.',
+    scheduledDate: pastDate(55), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 2, actualHours: 2,
+    workDescription: 'Semua 12 APAR diperiksa. 2 unit tekanan rendah sudah diisi ulang. Semua segel dalam kondisi baik.',
+    problems: '2 APAR di balai desa menunjukkan tekanan rendah. Sudah diisi ulang oleh teknisi.',
+    completedAt: pastDate(55) + 'T10:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist5a, hendraId);
+
+  const rt5Pending = createST({
+    teamId: team1Id, requiredTaskId: rt5Id, type: 'recurring',
+    desc: 'Fire Extinguisher Inspection', overview: 'Inspect all fire extinguishers in public buildings and ensure they are functional.',
+    scheduledDate: pastDate(25), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt5Pending, fireExtId);
+
+  const rt5Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt5Id, type: 'recurring',
+    desc: 'Fire Extinguisher Inspection', overview: 'Inspect all fire extinguishers in public buildings and ensure they are functional.',
+    scheduledDate: futureDate(5), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt5Plan1, fireExtId);
+
+  const rt5Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt5Id, type: 'recurring',
+    desc: 'Fire Extinguisher Inspection', overview: 'Inspect all fire extinguishers in public buildings and ensure they are functional.',
+    scheduledDate: futureDate(35), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt5Plan2, fireExtId);
+
+  // RT7 - Fire Hazard Assessment historical
+  const hist7a = createST({
+    teamId: team1Id, requiredTaskId: rt7Id, type: 'recurring',
+    desc: 'Fire Hazard Assessment', overview: 'Identify and document fire hazards throughout the village.',
+    scheduledDate: pastDate(85), priority: 'high', state: 'completed',
+    responsibleId: hendraId, estimateHours: 3, actualHours: 3,
+    workDescription: 'Penilaian bahaya kebakaran selesai. Area pasar diidentifikasi sebagai risiko tertinggi. 8 titik berbahaya didokumentasikan dan dilaporkan ke kepala desa.',
+    problems: 'Ditemukan kabel listrik tidak aman di 3 rumah dekat pasar. Pemilik sudah dihubungi dan diberi waktu 2 minggu untuk memperbaiki.',
+    completedAt: pastDate(85) + 'T12:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist7a, hendraId);
+
+  const rt7Pending = createST({
+    teamId: team1Id, requiredTaskId: rt7Id, type: 'recurring',
+    desc: 'Fire Hazard Assessment', overview: 'Identify and document fire hazards throughout the village.',
+    scheduledDate: pastDate(40), priority: 'high', state: 'pending',
+    responsibleId: hendraId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt7Pending, hendraId);
+
+  const rt7Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt7Id, type: 'recurring',
+    desc: 'Fire Hazard Assessment', overview: 'Identify and document fire hazards throughout the village.',
+    scheduledDate: futureDate(5), priority: 'high', state: 'planned',
+    responsibleId: hendraId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt7Plan1, hendraId);
+
+  const rt7Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt7Id, type: 'recurring',
+    desc: 'Fire Hazard Assessment', overview: 'Identify and document fire hazards throughout the village.',
+    scheduledDate: futureDate(50), priority: 'high', state: 'planned',
+    responsibleId: hendraId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt7Plan2, hendraId);
+
+  // RT8 - Building Safety Inspection (one-off future)
+  const rt8Pending = createST({
+    teamId: team1Id, requiredTaskId: rt8Id, type: 'planned',
+    desc: 'Building Safety Inspection', overview: 'Assess structural safety of key village buildings including the hall, school, and health clinic.',
+    scheduledDate: futureDate(5), priority: 'urgent', state: 'pending',
+    responsibleId: null, estimateHours: 8
+  });
+
+  // RT9 - Earthquake Emergency Kit Check historical
+  const hist9a = createST({
+    teamId: team1Id, requiredTaskId: rt9Id, type: 'recurring',
+    desc: 'Earthquake Emergency Kit Check', overview: 'Verify all emergency kits are complete, accessible, and ready for earthquake emergency response.',
+    scheduledDate: pastDate(110), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 2, actualHours: 2.5,
+    workDescription: 'Semua 8 kit darurat diperiksa. Kit di ruang penyimpanan memerlukan akses yang lebih baik. Lampu senter di 3 kit diganti baterainya.',
+    problems: 'Kit di gudang penyimpanan sulit diakses karena terhalang barang lain. Sudah diatur ulang penempatannya.',
+    completedAt: pastDate(110) + 'T11:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist9a, rinaId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist9a, jokoId);
+
+  const rt9Pending = createST({
+    teamId: team1Id, requiredTaskId: rt9Id, type: 'recurring',
+    desc: 'Earthquake Emergency Kit Check', overview: 'Verify all emergency kits are complete, accessible, and ready for earthquake emergency response.',
+    scheduledDate: pastDate(50), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Pending, firstAidId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Pending, blanketId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Pending, flashlightId);
+
+  const rt9Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt9Id, type: 'recurring',
+    desc: 'Earthquake Emergency Kit Check', overview: 'Verify all emergency kits are complete, accessible, and ready for earthquake emergency response.',
+    scheduledDate: futureDate(10), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan1, firstAidId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan1, blanketId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan1, flashlightId);
+
+  const rt9Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt9Id, type: 'recurring',
+    desc: 'Earthquake Emergency Kit Check', overview: 'Verify all emergency kits are complete, accessible, and ready for earthquake emergency response.',
+    scheduledDate: futureDate(70), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan2, firstAidId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan2, blanketId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt9Plan2, flashlightId);
+
+  // RT10 - Community Earthquake Response Training historical
+  const hist10a = createST({
+    teamId: team1Id, requiredTaskId: rt10Id, type: 'recurring',
+    desc: 'Community Earthquake Response Training', overview: 'Train community members in earthquake response procedures including drop-cover-hold and post-earthquake safety checks.',
+    scheduledDate: pastDate(330), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 8, actualHours: 9,
+    workDescription: 'Pelatihan dilaksanakan di balai desa dengan 85 peserta. Sesi teori pagi dan praktik siang berjalan lancar. Pejabat BPBD hadir sebagai fasilitator.',
+    problems: 'Peserta lansia dan anak-anak perlu sesi terpisah. Sudah direncanakan untuk pelatihan berikutnya.',
+    completedAt: pastDate(330) + 'T16:00:00.000Z'
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist10a, uid);
+  }
+
+  const rt10Pending = createST({
+    teamId: team1Id, requiredTaskId: rt10Id, type: 'recurring',
+    desc: 'Community Earthquake Response Training', overview: 'Train community members in earthquake response procedures including drop-cover-hold and post-earthquake safety checks.',
+    scheduledDate: pastDate(150), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 8
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt10Pending, uid);
+  }
+
+  const rt10Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt10Id, type: 'recurring',
+    desc: 'Community Earthquake Response Training', overview: 'Train community members in earthquake response procedures including drop-cover-hold and post-earthquake safety checks.',
+    scheduledDate: futureDate(30), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 8
+  });
+  for (const uid of [budiId, sitiId, ahmadId, dewiId, hendraId, rinaId, jokoId]) {
+    db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt10Plan1, uid);
+  }
+
+  // RT11 - Emergency Communication Tree Test historical
+  const hist11a = createST({
+    teamId: team1Id, requiredTaskId: rt11Id, type: 'recurring',
+    desc: 'Emergency Communication Tree Test', overview: 'Test the village emergency communication chain to ensure all household leaders can be reached within 15 minutes.',
+    scheduledDate: pastDate(88), priority: 'medium', state: 'completed',
+    responsibleId: null, estimateHours: 1, actualHours: 1,
+    workDescription: 'Rantai komunikasi diaktifkan pukul 08:00. Semua 45 kepala rumah tangga berhasil dihubungi dalam 14 menit.',
+    problems: '3 nomor telepon sudah tidak aktif. Daftar kontak sudah diperbarui.',
+    completedAt: pastDate(88) + 'T09:30:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist11a, budiId);
+
+  const hist11b = createST({
+    teamId: team1Id, requiredTaskId: rt11Id, type: 'recurring',
+    desc: 'Emergency Communication Tree Test', overview: 'Test the village emergency communication chain to ensure all household leaders can be reached within 15 minutes.',
+    scheduledDate: pastDate(58), priority: 'medium', state: 'completed',
+    responsibleId: null, estimateHours: 1, actualHours: 0.75,
+    workDescription: 'Tes komunikasi berhasil. Waktu respons meningkat menjadi 11 menit. Semua RT berhasil dihubungi.',
+    problems: 'Tidak ada masalah.',
+    completedAt: pastDate(58) + 'T09:15:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist11b, sitiId);
+
+  const rt11Pending = createST({
+    teamId: team1Id, requiredTaskId: rt11Id, type: 'recurring',
+    desc: 'Emergency Communication Tree Test', overview: 'Test the village emergency communication chain to ensure all household leaders can be reached within 15 minutes.',
+    scheduledDate: pastDate(28), priority: 'medium', state: 'pending',
+    responsibleId: null, estimateHours: 1
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt11Pending, radioId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt11Pending, megaphoneId);
+
+  // RT11 planned (3 instances)
+  for (let i = 1; i <= 3; i++) {
+    const rt11Plan = createST({
+      teamId: team1Id, requiredTaskId: rt11Id, type: 'recurring',
+      desc: 'Emergency Communication Tree Test', overview: 'Test the village emergency communication chain to ensure all household leaders can be reached within 15 minutes.',
+      scheduledDate: futureDate(30 * i - 28), priority: 'medium', state: 'planned',
+      responsibleId: null, estimateHours: 1
+    });
+    db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt11Plan, radioId);
+    db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt11Plan, megaphoneId);
+  }
+
+  // RT12 - Search & Rescue Team Practice historical
+  const hist12a = createST({
+    teamId: team1Id, requiredTaskId: rt12Id, type: 'recurring',
+    desc: 'Search & Rescue Team Practice', overview: 'Practice search and rescue techniques for locating and extracting trapped survivors after earthquake or building collapse.',
+    scheduledDate: pastDate(87), priority: 'high', state: 'completed',
+    responsibleId: null, estimateHours: 5, actualHours: 5.5,
+    workDescription: 'Latihan SAR dilaksanakan dengan 3 skenario penyelamatan. Tim berhasil mengekstrak korban simulasi dalam rata-rata 8 menit. Rotasi peran tim berjalan baik.',
+    problems: 'Tali pengaman memerlukan penggantian segera — terlihat aus di beberapa bagian. Sudah dipesan yang baru.',
+    completedAt: pastDate(87) + 'T15:00:00.000Z'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist12a, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist12a, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(hist12a, hendraId);
+
+  const rt12Pending = createST({
+    teamId: team1Id, requiredTaskId: rt12Id, type: 'recurring',
+    desc: 'Search & Rescue Team Practice', overview: 'Practice search and rescue techniques for locating and extracting trapped survivors after earthquake or building collapse.',
+    scheduledDate: pastDate(42), priority: 'high', state: 'pending',
+    responsibleId: null, estimateHours: 5
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Pending, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Pending, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Pending, hendraId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt12Pending, ropeId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt12Pending, stretcherId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt12Pending, firstAidId);
+
+  const rt12Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt12Id, type: 'recurring',
+    desc: 'Search & Rescue Team Practice', overview: 'Practice search and rescue techniques for locating and extracting trapped survivors after earthquake or building collapse.',
+    scheduledDate: futureDate(3), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 5
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan1, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan1, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan1, hendraId);
+
+  const rt12Plan2 = createST({
+    teamId: team1Id, requiredTaskId: rt12Id, type: 'recurring',
+    desc: 'Search & Rescue Team Practice', overview: 'Practice search and rescue techniques for locating and extracting trapped survivors after earthquake or building collapse.',
+    scheduledDate: futureDate(48), priority: 'high', state: 'planned',
+    responsibleId: null, estimateHours: 5
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, ahmadId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, hendraId);
+
+  // --- Pending one-off/manual tasks ---
+  const manualTask1 = createST({
+    teamId: team1Id, requiredTaskId: null, type: 'manual',
+    desc: 'Repair Village Hall Roof', overview: 'Urgent repair needed on the village hall roof due to storm damage. Several tiles have been displaced and rain is entering the building.',
+    scheduledDate: futureDate(3), priority: 'urgent', state: 'pending',
+    responsibleId: jokoId, estimateHours: 4,
+    planningNotes: 'Need to purchase approximately 30 replacement roof tiles. Check with the camat office for emergency maintenance budget approval.'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask1, jokoId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask1, hendraId);
+
+  const manualTask2 = createST({
+    teamId: team1Id, requiredTaskId: null, type: 'manual',
+    desc: 'Update Emergency Contact List', overview: 'Update the village emergency contact list with current phone numbers for all household heads, government contacts, and emergency services.',
+    scheduledDate: futureDate(7), priority: 'medium', state: 'pending',
+    responsibleId: sitiId, estimateHours: 2
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask2, sitiId);
+
+  const manualTask3 = createST({
+    teamId: team1Id, requiredTaskId: null, type: 'manual',
+    desc: 'Community Announcement - Upcoming Flood Season Preparation',
+    overview: 'Coordinate community announcement through mosque speakers, WhatsApp group, and village notice boards about the upcoming flood season and preparation actions each family should take.',
+    scheduledDate: futureDate(2), priority: 'high', state: 'pending',
+    responsibleId: budiId, estimateHours: 1.5,
+    planningNotes: 'Coordinate with pak RW for mosque announcement time. Prepare flyer for notice boards.'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask3, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask3, rinaId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(manualTask3, megaphoneId);
+
+  // Add some notes to tasks
+  db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(
+    rt1Pending, daveId, 'Prioritas pemeriksaan minggu ini karena musim hujan akan segera tiba.'
+  );
+  db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(
+    rt2Pending, budiId, 'Perlu membawa kendaraan untuk pengujian akses jalur bagian selatan.'
+  );
+  db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(
+    manualTask1, jokoId, 'Sudah mendapat persetujuan anggaran dari kepala desa. Material bisa dibeli besok.'
+  );
 
   // Notifications
-  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(team1Id, daveId, 'task_overdue', 'URGENT: Task "Replace Damaged Evacuation Sign - Route 2" is now 3 days overdue.');
-  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(team1Id, ahmadId, 'task_overdue', 'Your task "Replace Damaged Evacuation Sign - Route 2" is overdue. Please action immediately.');
-  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(team1Id, budiId, 'task_due_soon', 'Monthly Flood Evacuation Route Inspection is due soon. Please confirm team availability.');
+  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(
+    team1Id, daveId, 'task_overdue', 'Flood Evacuation Route Inspection is 45 days overdue. Please action immediately.'
+  );
+  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(
+    team1Id, budiId, 'task_overdue', 'Monthly Flood Risk Assessment is overdue. Please complete or update status.'
+  );
+  db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)').run(
+    team1Id, daveId, 'task_due_soon', 'Building Safety Inspection is scheduled in 5 days. Ensure team is ready.'
+  );
 
   console.log('Database seeded successfully!');
   console.log(`Teams: Desa Suka Maju (id:${team1Id}), Desa Harapan Baru (id:${team2Id})`);
-  console.log(`Users created: ${8} for team 1, 3 for team 2`);
-  console.log(`Required tasks: ${requiredTasks.length}`);
-  console.log(`Equipment items: 20`);
-}
-
-// Run if called directly
-if (require.main === module) {
-  seedDatabase();
 }
