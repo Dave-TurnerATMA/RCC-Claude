@@ -280,6 +280,7 @@ function CategoryForm({ category, onClose }: any) {
 function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryId, onClose }: any) {
   const { t } = useTranslation();
   const { team, user } = useApp();
+  const [isRecurring, setIsRecurring] = useState<boolean>(task ? !!task.is_recurring : false);
   const [form, setForm] = useState({
     short_description: task?.short_description || '',
     task_overview: task?.task_overview || '',
@@ -295,11 +296,15 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
   });
   const [crewIds, setCrewIds] = useState<number[]>(task?.crew?.map((c: any) => c.id) || []);
   const [eqIds, setEqIds] = useState<number[]>(task?.equipment?.map((e: any) => e.id) || []);
+  const [steps, setSteps] = useState<string[]>(task?.steps?.map((s: any) => s.step_text) || []);
   const [loading, setLoading] = useState(false);
 
   const set = (k: string, v: string) => setForm(prev => ({ ...prev, [k]: v }));
   const toggleCrew = (id: number) => setCrewIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleEq = (id: number) => setEqIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const addStep = () => setSteps(prev => [...prev, '']);
+  const removeStep = (i: number) => setSteps(prev => prev.filter((_, idx) => idx !== i));
+  const setStep = (i: number, v: string) => setSteps(prev => prev.map((s, idx) => idx === i ? v : s));
 
   const submit = async () => {
     if (!form.short_description.trim()) {
@@ -314,15 +319,17 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
         task_overview: form.task_overview,
         top_tips: form.top_tips,
         priority: form.priority,
+        is_recurring: isRecurring ? 1 : 0,
         scheduled_date: form.scheduled_date || null,
-        frequency_days: Number(form.frequency_days),
+        frequency_days: isRecurring ? Number(form.frequency_days) : null,
         default_responsible_user_id: form.default_responsible_user_id ? Number(form.default_responsible_user_id) : null,
         estimate_hours: Number(form.estimate_hours),
-        planned_instances: Number(form.planned_instances),
+        planned_instances: isRecurring ? Number(form.planned_instances) : null,
         crew_type: form.crew_type,
         category_id: form.category_id ? Number(form.category_id) : null,
         crew_ids: crewIds,
         equipment_ids: eqIds,
+        steps: steps.filter(s => s.trim()),
       };
       if (task) {
         payload.updated_by_user_id = user!.id;
@@ -349,6 +356,24 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
             placeholder="Brief task name" />
         </div>
 
+        {/* Task type toggle */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => !task?.scheduled_date && setIsRecurring(false)}
+              disabled={!!task?.scheduled_date}
+              className={`flex-1 py-2 px-3 rounded-xl border-2 text-sm font-medium transition-all ${!isRecurring ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'} ${task?.scheduled_date ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+              One-Off
+            </button>
+            <button type="button" onClick={() => !task?.scheduled_date && setIsRecurring(true)}
+              disabled={!!task?.scheduled_date}
+              className={`flex-1 py-2 px-3 rounded-xl border-2 text-sm font-medium transition-all ${isRecurring ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'} ${task?.scheduled_date ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+              Recurring
+            </button>
+          </div>
+          {task?.scheduled_date && <p className="text-xs text-orange-600 mt-1">Type cannot be changed once a scheduled date is set.</p>}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Overview / Instructions</label>
           <textarea value={form.task_overview} onChange={e => set('task_overview', e.target.value)}
@@ -361,6 +386,33 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
           <textarea value={form.top_tips} onChange={e => set('top_tips', e.target.value)}
             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm resize-none h-16 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Helpful tips for the crew..." />
+        </div>
+
+        {/* Steps */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">Task Steps (optional checklist)</label>
+            <button type="button" onClick={addStep}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+              + Add Step
+            </button>
+          </div>
+          {steps.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">No steps defined. Add steps to create a checklist for task execution.</p>
+          ) : (
+            <div className="space-y-2">
+              {steps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-5 flex-shrink-0">{i + 1}.</span>
+                  <input type="text" value={step} onChange={e => setStep(i, e.target.value)}
+                    placeholder={`Step ${i + 1}`}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  <button type="button" onClick={() => removeStep(i)}
+                    className="text-red-400 hover:text-red-600 text-sm px-1 flex-shrink-0">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -391,9 +443,10 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+            <label className={`block text-sm font-medium mb-1 ${isRecurring ? 'text-gray-700' : 'text-gray-400'}`}>Frequency</label>
             <select value={form.frequency_days} onChange={e => set('frequency_days', e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              disabled={!isRecurring}
+              className={`w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isRecurring ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}>
               <option value="7">Weekly (7 days)</option>
               <option value="14">Fortnightly (14)</option>
               <option value="30">Monthly (30)</option>
@@ -413,10 +466,11 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Planned Instances</label>
+            <label className={`block text-sm font-medium mb-1 ${isRecurring ? 'text-gray-700' : 'text-gray-400'}`}>Planned Instances</label>
             <input type="number" min="1" max="10" value={form.planned_instances}
               onChange={e => set('planned_instances', e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              disabled={!isRecurring}
+              className={`w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isRecurring ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`} />
           </div>
         </div>
 

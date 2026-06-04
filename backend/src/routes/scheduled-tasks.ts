@@ -9,6 +9,15 @@ function enrichTask(task: any) {
   task.equipment = db.prepare('SELECT e.* FROM equipment e JOIN task_equipment te ON e.id = te.equipment_id WHERE te.scheduled_task_id = ?').all(task.id);
   task.notes = db.prepare('SELECT n.*, u.name as user_name FROM task_notes n LEFT JOIN users u ON n.user_id = u.id WHERE n.scheduled_task_id = ? ORDER BY n.created_at ASC').all(task.id);
   task.uploads = db.prepare('SELECT * FROM task_uploads WHERE scheduled_task_id = ? ORDER BY created_at DESC').all(task.id);
+  if (task.required_task_id) {
+    const steps = db.prepare('SELECT * FROM required_task_steps WHERE required_task_id = ? ORDER BY display_order').all(task.required_task_id) as any[];
+    const checkedSet = new Set(
+      (db.prepare('SELECT step_id FROM scheduled_task_step_checks WHERE scheduled_task_id = ?').all(task.id) as any[]).map(r => r.step_id)
+    );
+    task.steps = steps.map(s => ({ ...s, checked: checkedSet.has(s.id) }));
+  } else {
+    task.steps = [];
+  }
   return task;
 }
 
@@ -266,6 +275,17 @@ router.post('/:teamId/scheduled-tasks/:id/request-takeover', (req, res) => {
     db.prepare('INSERT INTO notifications (team_id, user_id, type, message) VALUES (?, ?, ?, ?)')
       .run(req.params.teamId, admin.id, 'takeover_request',
         `${user.name} has requested to take over the task: "${task.short_description}"`);
+  }
+  res.json({ success: true });
+});
+
+router.post('/:teamId/scheduled-tasks/:id/step-checks', (req, res) => {
+  const { step_id, checked } = req.body;
+  if (!step_id) return res.status(400).json({ error: 'step_id required' });
+  if (checked) {
+    db.prepare('INSERT OR IGNORE INTO scheduled_task_step_checks (scheduled_task_id, step_id) VALUES (?, ?)').run(req.params.id, step_id);
+  } else {
+    db.prepare('DELETE FROM scheduled_task_step_checks WHERE scheduled_task_id = ? AND step_id = ?').run(req.params.id, step_id);
   }
   res.json({ success: true });
 });

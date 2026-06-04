@@ -138,6 +138,26 @@ export default function TaskDetailsModal({ task, onClose, onRefresh }: Props) {
         {tab === 'overview' && (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 leading-relaxed">{fullTask.overview}</p>
+            {fullTask.steps?.length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <div className="text-xs font-semibold text-blue-800 uppercase mb-3">📋 Task Steps</div>
+                <div className="space-y-2">
+                  {fullTask.steps.map((step: any) => (
+                    <label key={step.id} className="flex items-start gap-3 cursor-pointer">
+                      <input type="checkbox" defaultChecked={step.checked}
+                        onChange={async (e) => {
+                          const checked = e.target.checked;
+                          step.checked = checked;
+                          try { await api.updateStepCheck(team!.id, fullTask.id, step.id, checked); } catch {}
+                        }}
+                        className="mt-0.5 w-4 h-4 rounded text-blue-600 border-gray-300 flex-shrink-0" />
+                      <span className={`text-sm ${step.checked ? 'line-through text-gray-400' : 'text-gray-700'}`}>{step.step_text}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-blue-500 mt-2">Not all steps need to be ticked to complete the task.</p>
+              </div>
+            )}
             {fullTask.required_task_overview && (
               <div className="bg-blue-50 rounded-xl p-4">
                 <div className="text-xs font-semibold text-blue-700 uppercase mb-2">{t('task.taskOverview')}</div>

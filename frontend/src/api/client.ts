@@ -59,6 +59,8 @@ export const api = {
   removeCrew: (teamId: number, taskId: number, userId: number) => api.delete(`/teams/${teamId}/scheduled-tasks/${taskId}/crew/${userId}`),
   addNote: (teamId: number, taskId: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/notes`, data),
   requestTakeover: (teamId: number, taskId: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/request-takeover`, data),
+  updateStepCheck: (teamId: number, taskId: number, stepId: number, checked: boolean) =>
+    api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/step-checks`, { step_id: stepId, checked }),
 
   // Equipment
   getEquipment: (teamId: number) => api.get(`/teams/${teamId}/equipment`),

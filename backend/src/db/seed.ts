@@ -95,6 +95,13 @@ export function seedDatabase() {
   db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt1Id, ahmadId);
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt1Id, ropeId);
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt1Id, megaphoneId);
+  const insertStep = db.prepare('INSERT INTO required_task_steps (required_task_id, step_text, display_order) VALUES (?, ?, ?)');
+  insertStep.run(rt1Id, 'Collect village flood risk checklist and map from village hall', 0);
+  insertStep.run(rt1Id, 'Walk perimeter of flood-prone zones, note water levels at each monitoring point', 1);
+  insertStep.run(rt1Id, 'Inspect all drainage channels for blockages — clear minor blockages on the spot', 2);
+  insertStep.run(rt1Id, 'Visit and record water level at the 3 main monitoring wells', 3);
+  insertStep.run(rt1Id, 'Identify any new construction that may affect drainage flow', 4);
+  insertStep.run(rt1Id, 'Update flood risk log and report findings to team lead', 5);
 
   // RT2: Flood Evacuation Route Inspection
   const rt2Id = insertRT.run(
@@ -125,6 +132,13 @@ export function seedDatabase() {
   ).lastInsertRowid as number;
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt3Id, foodId);
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt3Id, waterId);
+  insertStep.run(rt3Id, 'Open the emergency supply storage room and retrieve the inventory log', 0);
+  insertStep.run(rt3Id, 'Count all food items — record quantity and check expiry dates', 1);
+  insertStep.run(rt3Id, 'Count all water purification tablets — check packaging for damage', 2);
+  insertStep.run(rt3Id, 'Remove and set aside any expired or damaged items', 3);
+  insertStep.run(rt3Id, 'Update the inventory log with current counts', 4);
+  insertStep.run(rt3Id, 'Create a replenishment list for any items below minimum level', 5);
+  insertStep.run(rt3Id, 'Lock storage room and report status to administrator', 6);
 
   // RT4: Community Flood Warning Drill
   const rt4Id = insertRT.run(
@@ -161,6 +175,13 @@ export function seedDatabase() {
     'Check the pressure gauge first — if in red zone, arrange replacement immediately. Never skip any building even if it looks recently checked.'
   ).lastInsertRowid as number;
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt5Id, fireExtId);
+  insertStep.run(rt5Id, 'Collect the fire extinguisher inspection register from the office', 0);
+  insertStep.run(rt5Id, 'Visit each location on the register — Village Hall, Mosque, School, Health Clinic, Market', 1);
+  insertStep.run(rt5Id, 'For each extinguisher: check pressure gauge is in green zone', 2);
+  insertStep.run(rt5Id, 'Check safety pin and seal are intact and tamper tag is present', 3);
+  insertStep.run(rt5Id, 'Check expiry date on label — flag any expiring within 3 months', 4);
+  insertStep.run(rt5Id, 'Record condition and any issues in the inspection register', 5);
+  insertStep.run(rt5Id, 'Report any failed extinguishers to administrator for replacement', 6);
 
   // RT6: Community Fire Safety Education (one-off, no scheduled_date)
   const rt6Id = insertRT.run(
@@ -264,6 +285,73 @@ export function seedDatabase() {
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, ropeId);
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, stretcherId);
   db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt12Id, firstAidId);
+
+  // --- ONE-OFF REQUIRED TASKS WITH STEPS ---
+
+  // RT13: Install Emergency Water Storage Tanks (one-off, scheduled)
+  const rt13Id = insertRT.run(
+    team1Id, floodCatId,
+    'Install Emergency Water Storage Tanks',
+    'Install three 1,000-litre water storage tanks at the village hall for use during flood emergencies when tap water is contaminated.',
+    'high', 0,
+    futureDate(14),
+    budiId, 6,
+    'Tanks must be elevated off the ground on concrete blocks. Position near the emergency supply room. Connect to existing roof catchment if possible.',
+    null, null, null
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt13Id, budiId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt13Id, jokoId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt13Id, hendraId);
+  insertStep.run(rt13Id, 'Confirm tank delivery and inspect for any damage before signing receipt', 0);
+  insertStep.run(rt13Id, 'Prepare concrete block foundations at the 3 designated positions', 1);
+  insertStep.run(rt13Id, 'Position and level each tank on its foundation', 2);
+  insertStep.run(rt13Id, 'Connect inlet and outlet pipes — check all fittings for leaks', 3);
+  insertStep.run(rt13Id, 'Fill each tank and check for leaks at all connection points', 4);
+  insertStep.run(rt13Id, 'Install padlocks on all tank outlets and hand keys to administrator', 5);
+  insertStep.run(rt13Id, 'Label each tank with contents, capacity, and emergency contact', 6);
+  insertStep.run(rt13Id, 'Update village emergency resource map with new tank locations', 7);
+
+  // RT14: Create Community Evacuation Map (one-off, not yet scheduled)
+  const rt14Id = insertRT.run(
+    team1Id, floodCatId,
+    'Create Community Evacuation Map',
+    'Design and print a detailed evacuation map for the village showing all evacuation routes, assembly points, and hazard zones for flood and earthquake scenarios.',
+    'medium', 0,
+    null,
+    sitiId, 4,
+    'Map should cover all 5 RT areas. Use clear symbols. Print at A3 size for public display and A4 for household distribution.',
+    null, null, null
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt14Id, sitiId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt14Id, daveId);
+  insertStep.run(rt14Id, 'Collect existing village maps and aerial photos from kelurahan office', 0);
+  insertStep.run(rt14Id, 'Walk all 3 evacuation routes and mark on draft map', 1);
+  insertStep.run(rt14Id, 'Identify and mark all assembly points, water sources, and hazard zones', 2);
+  insertStep.run(rt14Id, 'Identify households with elderly, disabled, or young children — mark on map', 3);
+  insertStep.run(rt14Id, 'Create draft digital map — review with team lead and administrator', 4);
+  insertStep.run(rt14Id, 'Finalise map design and arrange printing (min 20 copies)', 5);
+  insertStep.run(rt14Id, 'Distribute maps to all RT heads and post copies in public areas', 6);
+
+  // RT15: Install Early Warning Siren System (one-off, urgent, scheduled soon)
+  const rt15Id = insertRT.run(
+    team1Id, quakeCatId,
+    'Install Early Warning Siren System',
+    'Install manual hand-crank warning sirens at 3 strategic locations in the village to provide audible alerts for earthquake and flood emergencies.',
+    'urgent', 0,
+    futureDate(7),
+    hendraId, 3,
+    'Siren locations: Village Hall, RT01 meeting point, RT04 meeting point. Mount at height of 3-4 metres for maximum coverage.',
+    null, null, null
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt15Id, hendraId);
+  db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(rt15Id, jokoId);
+  insertStep.run(rt15Id, 'Inspect siren units received — test each one before installation', 0);
+  insertStep.run(rt15Id, 'Prepare mounting brackets at Village Hall (3.5m on corner post)', 1);
+  insertStep.run(rt15Id, 'Install siren at Village Hall — test audibility at 200m radius', 2);
+  insertStep.run(rt15Id, 'Install siren at RT01 meeting point', 3);
+  insertStep.run(rt15Id, 'Install siren at RT04 meeting point', 4);
+  insertStep.run(rt15Id, 'Conduct community awareness session on siren signal meanings', 5);
+  insertStep.run(rt15Id, 'Document siren locations and assign maintenance responsibility to RT heads', 6);
 
   // ---- SCHEDULED TASKS ----
   // Helper to create a scheduled task and return its id
@@ -732,6 +820,26 @@ export function seedDatabase() {
   db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, budiId);
   db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, ahmadId);
   db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt12Plan2, hendraId);
+
+  // --- Planned tasks for one-off required tasks ---
+  const rt13ST = createST({
+    teamId: team1Id, requiredTaskId: rt13Id, type: 'planned',
+    desc: 'Install Emergency Water Storage Tanks', overview: 'Install three 1,000-litre water storage tanks at the village hall for use during flood emergencies when tap water is contaminated.',
+    scheduledDate: futureDate(14), priority: 'high', state: 'pending',
+    responsibleId: budiId, estimateHours: 6
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt13ST, budiId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt13ST, jokoId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt13ST, hendraId);
+
+  const rt15ST = createST({
+    teamId: team1Id, requiredTaskId: rt15Id, type: 'planned',
+    desc: 'Install Early Warning Siren System', overview: 'Install manual hand-crank warning sirens at 3 strategic locations in the village to provide audible alerts for earthquake and flood emergencies.',
+    scheduledDate: futureDate(7), priority: 'urgent', state: 'pending',
+    responsibleId: hendraId, estimateHours: 3
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt15ST, hendraId);
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt15ST, jokoId);
 
   // --- Pending one-off/manual tasks ---
   const manualTask1 = createST({

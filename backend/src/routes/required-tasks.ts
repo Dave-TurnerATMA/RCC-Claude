@@ -10,7 +10,16 @@ function enrichRT(t: any) {
     ...t,
     crew: db.prepare('SELECT u.id, u.name, u.role FROM users u JOIN required_task_crew rtc ON u.id = rtc.user_id WHERE rtc.required_task_id = ?').all(t.id),
     equipment: db.prepare('SELECT e.* FROM equipment e JOIN required_task_equipment rte ON e.id = rte.equipment_id WHERE rte.required_task_id = ?').all(t.id),
+    steps: db.prepare('SELECT * FROM required_task_steps WHERE required_task_id = ? ORDER BY display_order').all(t.id),
   };
+}
+
+function saveSteps(requiredTaskId: number, steps: string[]) {
+  db.prepare('DELETE FROM required_task_steps WHERE required_task_id = ?').run(requiredTaskId);
+  for (let i = 0; i < steps.length; i++) {
+    const text = (steps[i] || '').trim();
+    if (text) db.prepare('INSERT INTO required_task_steps (required_task_id, step_text, display_order) VALUES (?, ?, ?)').run(requiredTaskId, text, i);
+  }
 }
 
 // Categories
@@ -64,7 +73,7 @@ router.post('/:teamId/required-tasks', (req, res) => {
   const {
     short_description, overview, priority, is_recurring, scheduled_date,
     default_responsible_user_id, estimate_hours, task_overview, frequency_days,
-    planned_instances, top_tips, equipment_ids, crew_ids, category_id, created_by, origin
+    planned_instances, top_tips, equipment_ids, crew_ids, category_id, created_by, origin, steps
   } = req.body;
 
   if (!short_description || !overview) return res.status(400).json({ error: 'short_description and overview required' });
@@ -84,6 +93,7 @@ router.post('/:teamId/required-tasks', (req, res) => {
 
   if (equipment_ids) for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(id, eqId);
   if (crew_ids) for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(id, uid);
+  if (Array.isArray(steps)) saveSteps(id, steps);
 
   db.prepare('INSERT INTO required_task_logs (required_task_id, user_id, change_description) VALUES (?, ?, ?)')
     .run(id, created_by || null, 'Required task created');
@@ -100,7 +110,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
   const {
     short_description, overview, priority, is_recurring, scheduled_date,
     default_responsible_user_id, estimate_hours, task_overview, frequency_days,
-    planned_instances, top_tips, equipment_ids, crew_ids, category_id, updated_by
+    planned_instances, top_tips, equipment_ids, crew_ids, category_id, updated_by, steps
   } = req.body;
 
   const existing = db.prepare('SELECT * FROM required_tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.params.teamId) as any;
@@ -165,6 +175,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
     db.prepare('DELETE FROM required_task_crew WHERE required_task_id = ?').run(req.params.id);
     for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO required_task_crew VALUES (?, ?)').run(req.params.id, uid);
   }
+  if (Array.isArray(steps)) saveSteps(Number(req.params.id), steps);
 
   if (changes.length > 0) {
     db.prepare('INSERT INTO required_task_logs (required_task_id, user_id, change_description) VALUES (?, ?, ?)')
@@ -189,6 +200,7 @@ router.delete('/:teamId/required-tasks/:id', (req, res) => {
   db.prepare('DELETE FROM required_task_crew WHERE required_task_id = ?').run(req.params.id);
   db.prepare('DELETE FROM required_task_equipment WHERE required_task_id = ?').run(req.params.id);
   db.prepare('DELETE FROM required_task_logs WHERE required_task_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM required_task_steps WHERE required_task_id = ?').run(req.params.id);
   db.prepare('DELETE FROM scheduled_tasks WHERE required_task_id = ?').run(req.params.id);
   db.prepare('DELETE FROM required_tasks WHERE id = ? AND team_id = ?').run(req.params.id, req.params.teamId);
   res.json({ success: true });

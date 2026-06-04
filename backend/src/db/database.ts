@@ -149,6 +149,19 @@ export function initializeDatabase() {
       is_read INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS required_task_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      required_task_id INTEGER NOT NULL REFERENCES required_tasks(id),
+      step_text TEXT NOT NULL,
+      display_order INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_task_step_checks (
+      scheduled_task_id INTEGER NOT NULL REFERENCES scheduled_tasks(id),
+      step_id INTEGER NOT NULL REFERENCES required_task_steps(id),
+      PRIMARY KEY (scheduled_task_id, step_id)
+    );
   `);
 }
 

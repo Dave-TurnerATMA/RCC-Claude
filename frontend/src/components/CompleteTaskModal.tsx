@@ -76,10 +76,35 @@ export default function CompleteTaskModal({ task, onClose, onCompleted }: Props)
   const existingCrewIds = new Set(task.crew?.map((c: any) => c.id) || []);
   const availableUsers = users.filter(u => !existingCrewIds.has(u.id));
   const isRecurring = task.type === 'recurring';
+  const steps: any[] = task.steps || [];
+
+  const toggleStep = async (step: any) => {
+    const newChecked = !step.checked;
+    step.checked = newChecked;
+    try { await api.updateStepCheck(team!.id, task.id, step.id, newChecked); } catch {}
+  };
 
   return (
     <Modal isOpen title={`${t('complete.title')}: ${task.short_description}`} onClose={onClose} size="lg">
       <div className="space-y-5">
+        {/* Steps checklist */}
+        {steps.length > 0 && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <div className="text-sm font-semibold text-blue-800 mb-3">📋 Task Steps</div>
+            <div className="space-y-2">
+              {steps.map((step: any) => (
+                <label key={step.id} className="flex items-start gap-3 cursor-pointer group">
+                  <input type="checkbox" defaultChecked={step.checked}
+                    onChange={() => toggleStep(step)}
+                    className="mt-0.5 w-4 h-4 rounded text-blue-600 border-gray-300 flex-shrink-0" />
+                  <span className={`text-sm ${step.checked ? 'line-through text-gray-400' : 'text-gray-700'}`}>{step.step_text}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-blue-600 mt-2">Tick steps as you go — not required to complete all before submitting.</p>
+          </div>
+        )}
+
         {/* Outcome */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">{t('complete.outcome')} *</label>
