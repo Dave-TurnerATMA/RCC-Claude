@@ -484,13 +484,17 @@ function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryI
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Crew Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Participants</label>
             <select value={form.crew_type} onChange={e => set('crew_type', e.target.value)}
               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-              <option value="specific">Specific crew</option>
-              <option value="open_optional">Open (optional)</option>
-              <option value="all_expected">All expected</option>
+              <option value="specific">Crew (specific people)</option>
+              <option value="none">None (responsible only)</option>
+              <option value="open_optional">Open – Optional</option>
+              <option value="all_expected">All – Expected</option>
             </select>
+            {task && form.crew_type === 'specific' && crewIds.length > 0 && (
+              <p className="text-xs text-orange-600 mt-1">To change Participants type, first remove all crew members.</p>
+            )}
           </div>
         </div>
 

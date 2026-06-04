@@ -59,7 +59,7 @@ export default function YourSchedule() {
     <div className="flex flex-col">
       <div className="bg-white border-b px-4 py-3 sticky top-16 z-20">
         <h1 className="font-bold text-gray-900 text-lg">{t('nav.yourSchedule')}</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Tasks you're responsible for or involved in</p>
+        <p className="text-xs text-gray-500 mt-0.5">Tasks you're responsible for, involved in, or open to all</p>
       </div>
 
       <div className="p-3 space-y-3">
@@ -150,6 +150,12 @@ function MyTaskCard({ task, isOverdue, currentUserId, onComplete, onDetails, onR
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-medium">Responsible</span>
           )}
           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{t(`type.${task.type}`)}</span>
+          {task.crew_type === 'open_optional' && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">Open – Optional</span>
+          )}
+          {task.crew_type === 'all_expected' && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-medium">All – Expected</span>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-3">

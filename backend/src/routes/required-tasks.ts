@@ -73,7 +73,7 @@ router.post('/:teamId/required-tasks', (req, res) => {
   const {
     short_description, overview, priority, is_recurring, scheduled_date,
     default_responsible_user_id, estimate_hours, task_overview, frequency_days,
-    planned_instances, top_tips, equipment_ids, crew_ids, category_id, created_by, origin, steps
+    planned_instances, top_tips, equipment_ids, crew_ids, category_id, created_by, origin, steps, crew_type
   } = req.body;
 
   if (!short_description || !overview) return res.status(400).json({ error: 'short_description and overview required' });
@@ -81,14 +81,14 @@ router.post('/:teamId/required-tasks', (req, res) => {
   const id = db.prepare(`
     INSERT INTO required_tasks (team_id, category_id, short_description, overview, priority, is_recurring,
       scheduled_date, default_responsible_user_id, estimate_hours, task_overview, frequency_days,
-      planned_instances, top_tips, origin, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      planned_instances, top_tips, crew_type, origin, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.params.teamId, category_id || null, short_description, overview,
     priority || 'medium', is_recurring ? 1 : 0, scheduled_date || null,
     default_responsible_user_id || null, estimate_hours || null, task_overview || null,
     frequency_days || null, planned_instances || 2, top_tips || null,
-    origin || 'manual', created_by || null
+    crew_type || 'specific', origin || 'manual', created_by || null
   ).lastInsertRowid as number;
 
   if (equipment_ids) for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(id, eqId);
@@ -110,17 +110,31 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
   const {
     short_description, overview, priority, is_recurring, scheduled_date,
     default_responsible_user_id, estimate_hours, task_overview, frequency_days,
-    planned_instances, top_tips, equipment_ids, crew_ids, category_id, updated_by, steps
+    planned_instances, top_tips, equipment_ids, crew_ids, category_id, updated_by, steps, crew_type
   } = req.body;
 
   const existing = db.prepare('SELECT * FROM required_tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.params.teamId) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
+
+  // Validate crew_type lock: cannot change FROM 'specific' if crew members exist
+  if (crew_type !== undefined && crew_type !== existing.crew_type && existing.crew_type === 'specific') {
+    const rtCrewCount = (db.prepare('SELECT COUNT(*) as cnt FROM required_task_crew WHERE required_task_id = ?').get(req.params.id) as any).cnt;
+    const stCrewCount = (db.prepare(`
+      SELECT COUNT(*) as cnt FROM task_crew tc
+      JOIN scheduled_tasks st ON tc.scheduled_task_id = st.id
+      WHERE st.required_task_id = ? AND st.state IN ('pending','planned')
+    `).get(req.params.id) as any).cnt;
+    if (rtCrewCount > 0 || stCrewCount > 0) {
+      return res.status(400).json({ error: 'Cannot change Participants type from Crew while crew members are assigned. Remove all crew members first.' });
+    }
+  }
 
   const changes: string[] = [];
   if (short_description && short_description !== existing.short_description) changes.push(`Description changed`);
   if (priority && priority !== existing.priority) changes.push(`Priority changed to ${priority}`);
   if (scheduled_date !== undefined && scheduled_date !== existing.scheduled_date) changes.push(`Scheduled date changed to ${scheduled_date || 'none'}`);
   if (frequency_days !== undefined && frequency_days !== existing.frequency_days) changes.push(`Frequency changed to ${frequency_days} days`);
+  if (crew_type !== undefined && crew_type !== existing.crew_type) changes.push(`Participants changed to ${crew_type}`);
 
   // Handle scheduled_date changes
   if (scheduled_date === null && existing.scheduled_date !== null) {
@@ -155,6 +169,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
       frequency_days = COALESCE(?, frequency_days),
       planned_instances = COALESCE(?, planned_instances),
       top_tips = COALESCE(?, top_tips),
+      crew_type = COALESCE(?, crew_type),
       updated_at = datetime('now')
     WHERE id = ? AND team_id = ?
   `).run(
@@ -163,9 +178,16 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
     scheduled_date !== undefined ? scheduled_date : null,
     default_responsible_user_id !== undefined ? default_responsible_user_id : null,
     estimate_hours ?? null, task_overview ?? null, frequency_days ?? null,
-    planned_instances ?? null, top_tips ?? null,
+    planned_instances ?? null, top_tips ?? null, crew_type ?? null,
     req.params.id, req.params.teamId
   );
+
+  // Sync crew_type to associated pending/planned scheduled tasks
+  if (crew_type !== undefined && crew_type !== existing.crew_type) {
+    db.prepare(
+      "UPDATE scheduled_tasks SET crew_type=?, updated_at=datetime('now') WHERE required_task_id=? AND state IN ('pending','planned')"
+    ).run(crew_type, req.params.id);
+  }
 
   if (equipment_ids !== undefined) {
     db.prepare('DELETE FROM required_task_equipment WHERE required_task_id = ?').run(req.params.id);

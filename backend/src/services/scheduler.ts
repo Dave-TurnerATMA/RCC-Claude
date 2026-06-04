@@ -15,10 +15,12 @@ export function createScheduledTasksForRequired(requiredTaskId: number, teamId: 
   const crewIds = (db.prepare('SELECT user_id FROM required_task_crew WHERE required_task_id = ?').all(requiredTaskId) as any[]).map(r => r.user_id);
   const equipIds = (db.prepare('SELECT equipment_id FROM required_task_equipment WHERE required_task_id = ?').all(requiredTaskId) as any[]).map(r => r.equipment_id);
 
+  const crewType = rt.crew_type || 'specific';
+
   const firstId = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-  `).run(teamId, requiredTaskId, type, rt.short_description, rt.overview, rt.scheduled_date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null).lastInsertRowid;
+    INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours, crew_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+  `).run(teamId, requiredTaskId, type, rt.short_description, rt.overview, rt.scheduled_date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null, crewType).lastInsertRowid;
 
   for (const uid of crewIds) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(firstId, uid);
   for (const eqId of equipIds) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(firstId, eqId);
@@ -29,9 +31,9 @@ export function createScheduledTasksForRequired(requiredTaskId: number, teamId: 
   for (let i = 1; i <= count; i++) {
     const date = addDays(rt.scheduled_date, rt.frequency_days * i);
     const id = db.prepare(`
-      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours)
-      VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'planned', ?, ?)
-    `).run(teamId, requiredTaskId, rt.short_description, rt.overview, date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null).lastInsertRowid;
+      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours, crew_type)
+      VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'planned', ?, ?, ?)
+    `).run(teamId, requiredTaskId, rt.short_description, rt.overview, date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null, crewType).lastInsertRowid;
     for (const uid of crewIds) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(id, uid);
     for (const eqId of equipIds) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(id, eqId);
   }
@@ -49,6 +51,8 @@ export function promoteNextPlannedTask(requiredTaskId: number, teamId: number) {
     "SELECT * FROM scheduled_tasks WHERE required_task_id = ? AND state = 'planned' ORDER BY scheduled_date ASC LIMIT 1"
   ).get(requiredTaskId) as any;
 
+  const promoteCrewType = rt.crew_type || 'specific';
+
   if (nextPlanned) {
     db.prepare("UPDATE scheduled_tasks SET state = 'pending', updated_at = datetime('now') WHERE id = ?").run(nextPlanned.id);
   } else {
@@ -58,9 +62,9 @@ export function promoteNextPlannedTask(requiredTaskId: number, teamId: number) {
     if (!lastTask) return;
     const nextDate = addDays(lastTask.scheduled_date, rt.frequency_days);
     const id = db.prepare(`
-      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours)
-      VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'pending', ?, ?)
-    `).run(rt.team_id, requiredTaskId, rt.short_description, rt.overview, nextDate, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null).lastInsertRowid;
+      INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours, crew_type)
+      VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'pending', ?, ?, ?)
+    `).run(rt.team_id, requiredTaskId, rt.short_description, rt.overview, nextDate, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null, promoteCrewType).lastInsertRowid;
     for (const uid of crewIds) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(id, uid);
   }
 
@@ -76,9 +80,9 @@ export function promoteNextPlannedTask(requiredTaskId: number, teamId: number) {
     for (let i = 1; i <= needed; i++) {
       const date = addDays(lastTask.scheduled_date, rt.frequency_days * i);
       const id = db.prepare(`
-        INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours)
-        VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'planned', ?, ?)
-      `).run(rt.team_id, requiredTaskId, rt.short_description, rt.overview, date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null).lastInsertRowid;
+        INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview, scheduled_date, priority, state, responsible_user_id, estimate_hours, crew_type)
+        VALUES (?, ?, 'recurring', ?, ?, ?, ?, 'planned', ?, ?, ?)
+      `).run(rt.team_id, requiredTaskId, rt.short_description, rt.overview, date, rt.priority, rt.default_responsible_user_id || null, rt.estimate_hours || null, promoteCrewType).lastInsertRowid;
       for (const uid of crewIds) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(id, uid);
     }
   }

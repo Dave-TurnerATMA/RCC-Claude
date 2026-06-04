@@ -353,6 +353,46 @@ export function seedDatabase() {
   insertStep.run(rt15Id, 'Conduct community awareness session on siren signal meanings', 5);
   insertStep.run(rt15Id, 'Document siren locations and assign maintenance responsibility to RT heads', 6);
 
+  // RT16: Community Emergency Volunteer Patrol (open_optional - anyone can join)
+  const rt16Id = db.prepare(`
+    INSERT INTO required_tasks (team_id, category_id, short_description, overview, priority, is_recurring,
+      scheduled_date, default_responsible_user_id, estimate_hours, task_overview, frequency_days,
+      planned_instances, top_tips, crew_type, origin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+  `).run(
+    team1Id, floodCatId,
+    'Community Emergency Volunteer Patrol',
+    'Monthly patrol of flood-prone areas, evacuation routes, and key infrastructure. Open to all team members who wish to participate.',
+    'medium', 1,
+    futureDate(5),
+    budiId, 2,
+    'Walk the main flood risk zones and check key infrastructure. Log any concerns in the patrol register.',
+    30, 2,
+    'Anyone is welcome to join — the more eyes the better. Bring a phone to photograph any issues found.',
+    'open_optional'
+  ).lastInsertRowid as number;
+
+  // RT17: Village Emergency Assembly Drill (all_expected - everyone must attend)
+  const rt17Id = db.prepare(`
+    INSERT INTO required_tasks (team_id, category_id, short_description, overview, priority, is_recurring,
+      scheduled_date, default_responsible_user_id, estimate_hours, task_overview, frequency_days,
+      planned_instances, top_tips, crew_type, origin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+  `).run(
+    team1Id, quakeCatId,
+    'Village Emergency Assembly Drill',
+    'Quarterly drill where ALL team members are expected to report to the village hall emergency assembly point within 15 minutes of the alarm being sounded.',
+    'high', 1,
+    futureDate(21),
+    daveId, 2,
+    'Test the full assembly process including roll call and task assignment. All team members must attend and be accounted for.',
+    90, 2,
+    'Make sure everyone knows the assembly point location. Send reminder 24 hours before. Test the communication chain first.',
+    'all_expected'
+  ).lastInsertRowid as number;
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt17Id, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO required_task_equipment VALUES (?, ?)').run(rt17Id, radioId);
+
   // ---- SCHEDULED TASKS ----
   // Helper to create a scheduled task and return its id
   function createST(data: {
@@ -371,18 +411,20 @@ export function seedDatabase() {
     problems?: string | null;
     completedAt?: string | null;
     planningNotes?: string | null;
+    crewType?: string;
   }): number {
     return db.prepare(`
       INSERT INTO scheduled_tasks (team_id, required_task_id, type, short_description, overview,
         scheduled_date, priority, state, responsible_user_id, estimate_hours, actual_hours,
-        work_description, problems, completed_at, planning_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        work_description, problems, completed_at, planning_notes, crew_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.teamId, data.requiredTaskId, data.type, data.desc, data.overview,
       data.scheduledDate, data.priority, data.state, data.responsibleId,
       data.estimateHours, data.actualHours ?? null,
       data.workDescription ?? null, data.problems ?? null,
-      data.completedAt ?? null, data.planningNotes ?? null
+      data.completedAt ?? null, data.planningNotes ?? null,
+      data.crewType ?? 'specific'
     ).lastInsertRowid as number;
   }
 
@@ -871,6 +913,46 @@ export function seedDatabase() {
   db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask3, budiId);
   db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(manualTask3, rinaId);
   db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(manualTask3, megaphoneId);
+
+  // RT16 - Community Emergency Volunteer Patrol (open_optional)
+  const rt16Pending = createST({
+    teamId: team1Id, requiredTaskId: rt16Id, type: 'recurring',
+    desc: 'Community Emergency Volunteer Patrol',
+    overview: 'Monthly patrol of flood-prone areas, evacuation routes, and key infrastructure. Open to all team members who wish to participate.',
+    scheduledDate: futureDate(5), priority: 'medium', state: 'pending',
+    responsibleId: budiId, estimateHours: 2, crewType: 'open_optional'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt16Pending, budiId);
+
+  const rt16Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt16Id, type: 'recurring',
+    desc: 'Community Emergency Volunteer Patrol',
+    overview: 'Monthly patrol of flood-prone areas, evacuation routes, and key infrastructure. Open to all team members who wish to participate.',
+    scheduledDate: futureDate(35), priority: 'medium', state: 'planned',
+    responsibleId: budiId, estimateHours: 2, crewType: 'open_optional'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(rt16Plan1, budiId);
+
+  // RT17 - Village Emergency Assembly Drill (all_expected)
+  const rt17Pending = createST({
+    teamId: team1Id, requiredTaskId: rt17Id, type: 'recurring',
+    desc: 'Village Emergency Assembly Drill',
+    overview: 'Quarterly drill where ALL team members are expected to report to the village hall emergency assembly point within 15 minutes of the alarm being sounded.',
+    scheduledDate: futureDate(21), priority: 'high', state: 'pending',
+    responsibleId: daveId, estimateHours: 2, crewType: 'all_expected'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt17Pending, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt17Pending, radioId);
+
+  const rt17Plan1 = createST({
+    teamId: team1Id, requiredTaskId: rt17Id, type: 'recurring',
+    desc: 'Village Emergency Assembly Drill',
+    overview: 'Quarterly drill where ALL team members are expected to report to the village hall emergency assembly point within 15 minutes of the alarm being sounded.',
+    scheduledDate: futureDate(111), priority: 'high', state: 'planned',
+    responsibleId: daveId, estimateHours: 2, crewType: 'all_expected'
+  });
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt17Plan1, megaphoneId);
+  db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(rt17Plan1, radioId);
 
   // Add some notes to tasks
   db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(
