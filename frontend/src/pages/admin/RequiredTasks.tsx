@@ -299,7 +299,7 @@ function CategoryForm({ category, onClose }: any) {
   );
 }
 
-function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryId, onClose }: any) {
+export function RequiredTaskForm({ task, users, equipment, categories, defaultCategoryId, onClose }: any) {
   const { t } = useTranslation();
   const { team, user } = useApp();
   const [isRecurring, setIsRecurring] = useState<boolean>(task ? !!task.is_recurring : false);

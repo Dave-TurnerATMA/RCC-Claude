@@ -7,6 +7,7 @@ import YourSchedule from './pages/execution/YourSchedule';
 import Volunteer from './pages/execution/Volunteer';
 import YourHistory from './pages/execution/YourHistory';
 import Dashboard from './pages/admin/Dashboard';
+import ActivityOverview from './pages/admin/ActivityOverview';
 import RequiredTasks from './pages/admin/RequiredTasks';
 import Resources from './pages/admin/Resources';
 import TeamMembers from './pages/admin/TeamMembers';
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/volunteer" element={<ProtectedRoute><Volunteer /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><YourHistory /></ProtectedRoute>} />
       <Route path="/admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+      <Route path="/admin/activity" element={<AdminRoute><ActivityOverview /></AdminRoute>} />
       <Route path="/admin/required-tasks" element={<AdminRoute><RequiredTasks /></AdminRoute>} />
       <Route path="/admin/resources" element={<AdminRoute><Resources /></AdminRoute>} />
       <Route path="/admin/team-members" element={<AdminRoute><TeamMembers /></AdminRoute>} />
