@@ -15,6 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdminSection = location.pathname.startsWith('/admin');
 
   const execTabs = [
+    { path: '/happening', label: t('nav.happening'), icon: '🏠' },
     { path: '/schedule', label: t('nav.yourSchedule'), icon: '✅' },
     { path: '/volunteer', label: t('nav.volunteer'), icon: '🙋' },
     { path: '/history', label: t('nav.yourHistory'), icon: '📜' },

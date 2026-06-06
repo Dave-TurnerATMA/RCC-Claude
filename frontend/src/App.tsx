@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from './contexts/AppContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import WhatsHappening from './pages/execution/WhatsHappening';
 import YourSchedule from './pages/execution/YourSchedule';
 import Volunteer from './pages/execution/Volunteer';
 import YourHistory from './pages/execution/YourHistory';
@@ -19,7 +20,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { team, user, isAdmin } = useApp();
   if (!team || !user) return <Navigate to="/" replace />;
-  if (!isAdmin) return <Navigate to="/schedule" replace />;
+  if (!isAdmin) return <Navigate to="/happening" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -28,7 +29,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={team && user ? <Navigate to="/schedule" replace /> : <Login />} />
+      <Route path="/" element={team && user ? <Navigate to="/happening" replace /> : <Login />} />
+      <Route path="/happening" element={<ProtectedRoute><WhatsHappening /></ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute><YourSchedule /></ProtectedRoute>} />
       <Route path="/volunteer" element={<ProtectedRoute><Volunteer /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><YourHistory /></ProtectedRoute>} />
