@@ -8,7 +8,7 @@ set -e
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 GITHUB_BRANCH="claude/focused-volta-rLmgU"
-DB_FILE="$APP_DIR/community-prep.db"
+DB_FILE="$APP_DIR/backend/community-prep.db"
 
 echo "======================================================"
 echo " DESTROY AND REINSTALL"
