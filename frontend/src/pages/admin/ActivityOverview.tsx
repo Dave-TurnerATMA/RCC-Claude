@@ -2,24 +2,28 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useApp } from '../../contexts/AppContext';
-import PriorityBadge from '../../components/PriorityBadge';
 import StateBadge from '../../components/StateBadge';
 import TaskManageModal from '../../components/TaskManageModal';
 import { RequiredTaskForm } from './RequiredTasks';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+function fmtDate(dateStr: string): string {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function DisplayStateBadge({ label, color }: { label: string; color: string }) {
   const colorMap: Record<string, string> = {
-    gray: 'bg-gray-100 text-gray-600',
+    gray: 'bg-gray-100 text-gray-500',
     red: 'bg-red-100 text-red-700',
     yellow: 'bg-yellow-100 text-yellow-700',
     blue: 'bg-blue-100 text-blue-700',
     purple: 'bg-purple-100 text-purple-700',
     green: 'bg-green-100 text-green-700',
+    orange: 'bg-orange-100 text-orange-700',
   };
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${colorMap[color] || colorMap.gray}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${colorMap[color] || colorMap.gray}`}>
       {label}
     </span>
   );
@@ -30,7 +34,11 @@ function getRtDisplayState(rt: any, stsByRtId: Record<number, any[]>): { label: 
   const sts = (stsByRtId[rt.id] || []).sort((a: any, b: any) =>
     (a.scheduled_date || '').localeCompare(b.scheduled_date || '')
   );
-  if (sts.length === 0) return { label: 'Scheduled', color: 'purple' };
+  if (sts.length === 0) {
+    // No active STs — use completion_count to distinguish completed vs never-started
+    if (rt.completion_count > 0) return { label: 'Completed', color: 'green' };
+    return { label: 'Scheduled', color: 'purple' };
+  }
   const current = sts.find((s: any) => s.state === 'pending') || sts[0];
   if (current.state === 'pending' && current.scheduled_date && current.scheduled_date < TODAY) {
     return { label: 'Overdue', color: 'red' };
@@ -53,39 +61,26 @@ interface RtRowProps {
   displayState: { label: string; color: string };
   effectiveDate: string;
   catName?: string;
+  showDate: boolean;
   showCategory: boolean;
   onClick: () => void;
 }
 
-function RtRow({ rt, displayState, effectiveDate, catName, showCategory, onClick }: RtRowProps) {
+function RtRow({ rt, displayState, effectiveDate, catName, showDate, showCategory, onClick }: RtRowProps) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs text-gray-400 flex-shrink-0">{rt.is_recurring ? '🔄' : '📌'}</span>
-          <span className="text-sm font-medium text-gray-900">{rt.short_description}</span>
-          {showCategory && catName && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{catName}</span>
-          )}
-        </div>
-        {effectiveDate && (
-          <div className="text-xs text-gray-400 mt-0.5 sm:hidden">
-            📅 {new Date(effectiveDate + 'T00:00:00').toLocaleDateString()}
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <PriorityBadge priority={rt.priority} />
-        <DisplayStateBadge label={displayState.label} color={displayState.color} />
-        {effectiveDate && (
-          <span className="text-xs text-gray-400 hidden sm:inline">
-            📅 {new Date(effectiveDate + 'T00:00:00').toLocaleDateString()}
-          </span>
-        )}
-      </div>
+      <span className="text-sm flex-shrink-0 w-5 text-center">{rt.is_recurring ? '🔄' : '📌'}</span>
+      <span className="text-sm text-gray-900 flex-1 truncate min-w-0">{rt.short_description}</span>
+      {showCategory && catName && (
+        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">{catName}</span>
+      )}
+      {showDate && effectiveDate && (
+        <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(effectiveDate)}</span>
+      )}
+      <DisplayStateBadge label={displayState.label} color={displayState.color} />
     </div>
   );
 }
@@ -184,7 +179,10 @@ export default function ActivityOverview() {
                 view === 'adhoc' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Adhoc {adhocTasks.length > 0 && <span className="ml-1 bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full text-xs">{adhocTasks.length}</span>}
+              Adhoc
+              {adhocTasks.length > 0 && (
+                <span className="ml-1 bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{adhocTasks.length}</span>
+              )}
             </button>
           </div>
           {view === 'planned' && (
@@ -201,7 +199,7 @@ export default function ActivityOverview() {
         </div>
       </div>
 
-      <div className="p-3 space-y-3">
+      <div className="p-2 space-y-2">
         {loading ? (
           <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
         ) : view === 'planned' ? (
@@ -217,6 +215,7 @@ export default function ActivityOverview() {
                     displayState={getRtDisplayState(rt, stsByRtId)}
                     effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
                     catName={catMap[rt.category_id]}
+                    showDate
                     showCategory
                     onClick={() => setEditTask(rt)}
                   />
@@ -233,20 +232,21 @@ export default function ActivityOverview() {
                   <div key={cat.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <button
                       onClick={() => toggleCategory(cat.id)}
-                      className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-left"
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100 text-left"
                     >
-                      <span className="text-sm font-bold text-gray-800 flex-1">{cat.name}</span>
+                      <span className="text-xs font-bold text-gray-700 flex-1">{cat.name}</span>
                       <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">{catTasks.length}</span>
                       <span className="text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
                     </button>
                     {expanded && (
-                      <div className="divide-y divide-gray-50">
+                      <div>
                         {catTasks.map((rt: any) => (
                           <RtRow
                             key={rt.id}
                             rt={rt}
                             displayState={getRtDisplayState(rt, stsByRtId)}
                             effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
+                            showDate={false}
                             showCategory={false}
                             onClick={() => setEditTask(rt)}
                           />
@@ -258,19 +258,20 @@ export default function ActivityOverview() {
               })}
               {displayRts.filter((t: any) => !t.category_id).length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-600 flex-1">Uncategorized</span>
+                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500 flex-1">Uncategorized</span>
                     <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">
                       {displayRts.filter((t: any) => !t.category_id).length}
                     </span>
                   </div>
-                  <div className="divide-y divide-gray-50">
+                  <div>
                     {displayRts.filter((t: any) => !t.category_id).map((rt: any) => (
                       <RtRow
                         key={rt.id}
                         rt={rt}
                         displayState={getRtDisplayState(rt, stsByRtId)}
                         effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
+                        showDate={false}
                         showCategory={false}
                         onClick={() => setEditTask(rt)}
                       />
@@ -300,22 +301,16 @@ export default function ActivityOverview() {
                 <div
                   key={st.id}
                   onClick={() => setManageTask(st)}
-                  className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900">{st.short_description}</div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400 mt-0.5">
-                      {st.scheduled_date && (
-                        <span>📅 {new Date(st.scheduled_date + 'T00:00:00').toLocaleDateString()}</span>
-                      )}
-                      {st.responsible_user_name && <span>👤 {st.responsible_user_name}</span>}
-                      <span className="capitalize">{st.type?.replace('_', ' ')}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <PriorityBadge priority={st.priority} />
-                    <StateBadge state={st.state} />
-                  </div>
+                  <span className="text-sm text-gray-900 flex-1 truncate min-w-0">{st.short_description}</span>
+                  {st.scheduled_date && (
+                    <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(st.scheduled_date)}</span>
+                  )}
+                  {st.responsible_user_name && (
+                    <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">{st.responsible_user_name}</span>
+                  )}
+                  <StateBadge state={st.state} />
                 </div>
               ))
             )}
