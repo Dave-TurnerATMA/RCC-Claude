@@ -6,11 +6,13 @@
   "nav": {
     "happening": "Apa yang Terjadi",
     "yourSchedule": "Jadwal Anda",
+    "teamActivity": "Aktivitas Tim",
     "volunteer": "Aktivitas Tim",
     "yourHistory": "Riwayat Anda",
     "dashboard": "Dasbor",
     "activityOverview": "Ikhtisar Aktivitas",
-    "requiredTasks": "Tugas Wajib",
+    "plannedTasks": "Tugas Terencana",
+    "requiredTasks": "Tugas Terencana",
     "resources": "Sumber Daya",
     "teamMembers": "Anggota Tim",
     "adminSection": "Admin",
@@ -80,7 +82,8 @@
   "status": {
     "active": "Aktif",
     "inactive": "Tidak Aktif",
-    "resigned": "Mengundurkan Diri"
+    "retired": "Pensiun",
+    "resigned": "Pensiun"
   },
   "task": {
     "shortDescription": "Deskripsi Singkat",

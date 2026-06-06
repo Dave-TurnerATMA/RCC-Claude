@@ -4,11 +4,11 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import WhatsHappening from './pages/execution/WhatsHappening';
 import YourSchedule from './pages/execution/YourSchedule';
-import Volunteer from './pages/execution/Volunteer';
+import TeamActivity from './pages/execution/TeamActivity';
 import YourHistory from './pages/execution/YourHistory';
 import Dashboard from './pages/admin/Dashboard';
 import ActivityOverview from './pages/admin/ActivityOverview';
-import RequiredTasks from './pages/admin/RequiredTasks';
+import PlannedTasks from './pages/admin/PlannedTasks';
 import Resources from './pages/admin/Resources';
 import TeamMembers from './pages/admin/TeamMembers';
 
@@ -33,11 +33,11 @@ export default function App() {
       <Route path="/" element={team && user ? <Navigate to="/happening" replace /> : <Login />} />
       <Route path="/happening" element={<ProtectedRoute><WhatsHappening /></ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute><YourSchedule /></ProtectedRoute>} />
-      <Route path="/volunteer" element={<ProtectedRoute><Volunteer /></ProtectedRoute>} />
+      <Route path="/team-activity" element={<ProtectedRoute><TeamActivity /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><YourHistory /></ProtectedRoute>} />
       <Route path="/admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
       <Route path="/admin/activity" element={<AdminRoute><ActivityOverview /></AdminRoute>} />
-      <Route path="/admin/required-tasks" element={<AdminRoute><RequiredTasks /></AdminRoute>} />
+      <Route path="/admin/planned-tasks" element={<AdminRoute><PlannedTasks /></AdminRoute>} />
       <Route path="/admin/resources" element={<AdminRoute><Resources /></AdminRoute>} />
       <Route path="/admin/team-members" element={<AdminRoute><TeamMembers /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

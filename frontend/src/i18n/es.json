@@ -6,11 +6,13 @@
   "nav": {
     "happening": "¿Qué Pasa?",
     "yourSchedule": "Tu Horario",
+    "teamActivity": "Actividad del Equipo",
     "volunteer": "Actividad del Equipo",
     "yourHistory": "Tu Historial",
     "dashboard": "Panel",
     "activityOverview": "Resumen de Actividad",
-    "requiredTasks": "Tareas Requeridas",
+    "plannedTasks": "Tareas Planificadas",
+    "requiredTasks": "Tareas Planificadas",
     "resources": "Recursos",
     "teamMembers": "Miembros del Equipo",
     "adminSection": "Admin",
@@ -80,6 +82,7 @@
   "status": {
     "active": "Activo",
     "inactive": "Inactivo",
+    "retired": "Retirado",
     "resigned": "Retirado"
   },
   "task": {

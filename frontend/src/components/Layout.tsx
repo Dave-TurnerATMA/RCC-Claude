@@ -17,13 +17,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const execTabs = [
     { path: '/happening', label: t('nav.happening'), icon: '🏠' },
     { path: '/schedule', label: t('nav.yourSchedule'), icon: '✅' },
-    { path: '/volunteer', label: t('nav.volunteer'), icon: '🙋' },
+    { path: '/team-activity', label: t('nav.teamActivity'), icon: '👥' },
     { path: '/history', label: t('nav.yourHistory'), icon: '📜' },
   ];
   const adminTabs = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: '📊' },
     { path: '/admin/activity', label: t('nav.activityOverview'), icon: '📋' },
-    { path: '/admin/required-tasks', label: t('nav.requiredTasks'), icon: '🔄' },
+    { path: '/admin/planned-tasks', label: t('nav.plannedTasks'), icon: '🔄' },
     { path: '/admin/resources', label: t('nav.resources'), icon: '🛠️' },
     { path: '/admin/team-members', label: t('nav.teamMembers'), icon: '👥' },
   ];

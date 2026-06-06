@@ -25,7 +25,7 @@ export default function CompleteTaskModal({ task, onClose, onCompleted }: Props)
   const [additionalCrew, setAdditionalCrew] = useState<number[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<number[]>(task.equipment?.map((e: any) => e.id) || []);
   const [createFollowUp, setCreateFollowUp] = useState(false);
-  const [followUp, setFollowUp] = useState({ short_description: '', overview: '', priority: 'medium', estimate_hours: '' });
+  const [followUp, setFollowUp] = useState({ short_description: '', task_overview: '', priority: 'medium', estimate_hours: '' });
   const [loading, setLoading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
@@ -54,7 +54,9 @@ export default function CompleteTaskModal({ task, onClose, onCompleted }: Props)
         additional_crew_ids: additionalCrew,
         equipment_ids: selectedEquipment,
         follow_up_task: createFollowUp && followUp.short_description ? {
-          ...followUp,
+          short_description: followUp.short_description,
+          task_overview: followUp.task_overview || followUp.short_description,
+          priority: followUp.priority,
           estimate_hours: followUp.estimate_hours ? Number(followUp.estimate_hours) : null,
           responsible_user_id: user?.id || null,
         } : null,
@@ -201,7 +203,7 @@ export default function CompleteTaskModal({ task, onClose, onCompleted }: Props)
               <input type="text" value={followUp.short_description} onChange={e => setFU('short_description', e.target.value)}
                 className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Follow-up task description *" />
-              <textarea value={followUp.overview} onChange={e => setFU('overview', e.target.value)}
+              <textarea value={followUp.task_overview} onChange={e => setFU('task_overview', e.target.value)}
                 className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm resize-none h-16 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Details..." />
               <div className="flex gap-2">

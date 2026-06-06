@@ -52,7 +52,7 @@ export default function TaskDetailsModal({ task, onClose, onRefresh }: Props) {
     if (!noteText.trim() || !team) return;
     setAddingNote(true);
     try {
-      await api.addNote(team.id, task.id, { user_id: user?.id, note: noteText });
+      await api.addNote(team.id, task.id, { user_id: user?.id, note_text: noteText });
       setNoteText('');
       const updated = await api.getScheduledTask(team.id, task.id);
       setFullTask(updated);
@@ -137,7 +137,7 @@ export default function TaskDetailsModal({ task, onClose, onRefresh }: Props) {
 
         {tab === 'overview' && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700 leading-relaxed">{fullTask.overview}</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{fullTask.task_overview || fullTask.overview}</p>
             {fullTask.steps?.length > 0 && (
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                 <div className="text-xs font-semibold text-blue-800 uppercase mb-3">📋 Task Steps</div>
@@ -241,7 +241,7 @@ export default function TaskDetailsModal({ task, onClose, onRefresh }: Props) {
                     <span className="text-xs font-medium text-gray-600">{note.user_name}</span>
                     <span className="text-xs text-gray-400">{new Date(note.created_at).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-gray-700">{note.note}</p>
+                  <p className="text-sm text-gray-700">{note.note_text || note.note}</p>
                 </div>
               ))}
             </div>

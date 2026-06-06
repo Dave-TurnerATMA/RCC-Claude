@@ -7,6 +7,7 @@ import Modal from '../../components/Modal';
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-100 text-green-700 border-green-200',
   inactive: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  retired: 'bg-gray-100 text-gray-500 border-gray-200',
   resigned: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
@@ -23,7 +24,7 @@ export default function TeamMembers() {
   const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState<any>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [statusModal, setStatusModal] = useState<{ user: any; action: 'deactivate' | 'resign' } | null>(null);
+  const [statusModal, setStatusModal] = useState<{ user: any; action: 'deactivate' | 'retire' } | null>(null);
 
   const load = useCallback(async () => {
     if (!team) return;
@@ -40,7 +41,7 @@ export default function TeamMembers() {
 
   const activeUsers = users.filter(u => u.status === 'active');
   const inactiveUsers = users.filter(u => u.status === 'inactive');
-  const resignedUsers = users.filter(u => u.status === 'resigned');
+  const retiredUsers = users.filter(u => u.status === 'retired' || u.status === 'resigned');
 
   return (
     <div className="flex flex-col">
@@ -69,6 +70,7 @@ export default function TeamMembers() {
                       user={u}
                       onEdit={() => setEditUser(u)}
                       onDeactivate={() => setStatusModal({ user: u, action: 'deactivate' })}
+
                     />
                   ))}
                 </div>
@@ -86,7 +88,7 @@ export default function TeamMembers() {
                       key={u.id}
                       user={u}
                       onEdit={() => setEditUser(u)}
-                      onResign={() => setStatusModal({ user: u, action: 'resign' })}
+                      onRetire={() => setStatusModal({ user: u, action: 'retire' })}
                       onReactivate={async () => {
                         try {
                           await api.updateUser(team!.id, u.id, { status: 'active' });
@@ -99,13 +101,13 @@ export default function TeamMembers() {
               </section>
             )}
 
-            {resignedUsers.length > 0 && (
+            {retiredUsers.length > 0 && (
               <section>
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
-                  Resigned ({resignedUsers.length})
+                  Retired ({retiredUsers.length})
                 </div>
                 <div className="space-y-2">
-                  {resignedUsers.map(u => (
+                  {retiredUsers.map(u => (
                     <UserCard key={u.id} user={u} onEdit={() => setEditUser(u)} />
                   ))}
                 </div>
@@ -139,8 +141,8 @@ export default function TeamMembers() {
         />
       )}
 
-      {statusModal?.action === 'resign' && (
-        <ResignModal
+      {statusModal?.action === 'retire' && (
+        <RetireModal
           user={statusModal.user}
           onClose={() => setStatusModal(null)}
           onDone={load}
@@ -150,7 +152,7 @@ export default function TeamMembers() {
   );
 }
 
-function UserCard({ user, onEdit, onDeactivate, onResign, onReactivate }: any) {
+function UserCard({ user, onEdit, onDeactivate, onRetire, onReactivate }: any) {
   const { t } = useTranslation();
   const initials = user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
   return (
@@ -166,10 +168,10 @@ function UserCard({ user, onEdit, onDeactivate, onResign, onReactivate }: any) {
           {user.email && <div className="text-xs text-gray-400 truncate">{user.email}</div>}
           <div className="flex flex-wrap gap-1 mt-1.5">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600'}`}>
-              {t(`role.${user.role}`, user.role.replace('_', ' '))}
+              {String(t(`role.${user.role}`) || user.role.replace('_', ' '))}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${STATUS_COLORS[user.status] || 'bg-gray-100 text-gray-500'}`}>
-              {t(`status.${user.status}`, user.status)}
+              {String(t(`status.${user.status}`) || user.status)}
             </span>
             {user.active_task_count > 0 && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
@@ -195,10 +197,10 @@ function UserCard({ user, onEdit, onDeactivate, onResign, onReactivate }: any) {
               Reactivate
             </button>
           )}
-          {onResign && (
-            <button onClick={onResign}
+          {onRetire && (
+            <button onClick={onRetire}
               className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
-              Resign
+              Retire
             </button>
           )}
         </div>
@@ -349,7 +351,7 @@ function DeactivateModal({ user, activeUsers, onClose, onDone }: any) {
   );
 }
 
-function ResignModal({ user, onClose, onDone }: any) {
+function RetireModal({ user, onClose, onDone }: any) {
   const { t } = useTranslation();
   const { team } = useApp();
   const [loading, setLoading] = useState(false);
@@ -357,7 +359,7 @@ function ResignModal({ user, onClose, onDone }: any) {
   const confirm = async () => {
     setLoading(true);
     try {
-      await api.updateUser(team!.id, user.id, { status: 'resigned' });
+      await api.updateUser(team!.id, user.id, { status: 'retired' });
       onDone();
       onClose();
     } catch (e: any) {
@@ -368,11 +370,11 @@ function ResignModal({ user, onClose, onDone }: any) {
   };
 
   return (
-    <Modal isOpen title={`Mark ${user.name} as Resigned`} onClose={onClose}>
+    <Modal isOpen title={`Mark ${user.name} as Retired`} onClose={onClose}>
       <div className="space-y-4">
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-700">
-            This will mark <strong>{user.name}</strong> as resigned. They must have no active task assignments or default responsibilities before resigning.
+            This will mark <strong>{user.name}</strong> as retired. They must have no active task assignments or default crew responsibilities before retiring.
           </p>
         </div>
         <div className="flex gap-3">
@@ -382,7 +384,7 @@ function ResignModal({ user, onClose, onDone }: any) {
           </button>
           <button onClick={confirm} disabled={loading}
             className="flex-1 py-2.5 bg-gray-700 text-white rounded-xl font-medium disabled:opacity-40 hover:bg-gray-800 transition-colors">
-            {loading ? 'Processing...' : 'Mark as Resigned'}
+            {loading ? 'Processing...' : 'Mark as Retired'}
           </button>
         </div>
       </div>

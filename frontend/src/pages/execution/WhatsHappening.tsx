@@ -74,9 +74,9 @@ export default function WhatsHappening() {
       return { label: 'Responsible', color: 'bg-blue-100 text-blue-700' };
     if (task.crew?.some((c: any) => c.id === user?.id))
       return { label: 'Crew', color: 'bg-green-100 text-green-700' };
-    if (task.crew_type === 'all_expected')
+    if (task.participants === 'all_expected')
       return { label: 'All Expected', color: 'bg-purple-100 text-purple-700' };
-    if (task.crew_type === 'open_optional')
+    if (task.participants === 'open_optional')
       return { label: 'Open', color: 'bg-teal-100 text-teal-700' };
     return null;
   };
@@ -93,7 +93,9 @@ export default function WhatsHappening() {
     .filter(t => t.scheduled_date && t.scheduled_date >= today && t.scheduled_date <= in7Days)
     .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
   const volunteerTasks = allTasks
-    .filter(t => t.state === 'pending' && t.crew_type === 'specific' && (!t.crew || t.crew.length === 0))
+    .filter(t => t.state === 'pending' && t.participation_type === 'open' &&
+      (t.participants === 'open_optional' || t.participants === 'all_expected') &&
+      (!t.volunteer_limit || (t.crew?.length || 0) < t.volunteer_limit))
     .sort((a, b) => (a.scheduled_date || '').localeCompare(b.scheduled_date || ''));
 
   return (

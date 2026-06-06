@@ -42,7 +42,7 @@ export default function TaskManageModal({ task: initialTask, onClose, onRefresh 
 
   const addNote = async () => {
     if (!note.trim()) return;
-    await api.addNote(team!.id, task.id, { user_id: user!.id, note });
+    await api.addNote(team!.id, task.id, { user_id: user!.id, note_text: note });
     setNote('');
     refreshTask();
   };
@@ -108,7 +108,7 @@ export default function TaskManageModal({ task: initialTask, onClose, onRefresh 
 
         {tab === 'info' && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700 leading-relaxed">{task.overview}</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{task.task_overview || task.overview}</p>
             {task.steps?.length > 0 && (
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                 <div className="text-xs font-semibold text-blue-800 uppercase mb-3">📋 Task Steps</div>
@@ -236,7 +236,7 @@ export default function TaskManageModal({ task: initialTask, onClose, onRefresh 
                   <span className="text-xs font-medium text-gray-900">{n.user_name}</span>
                   <span className="text-xs text-gray-400">{new Date(n.created_at).toLocaleDateString()}</span>
                 </div>
-                <p className="text-sm text-gray-700">{n.note}</p>
+                <p className="text-sm text-gray-700">{n.note_text || n.note}</p>
               </div>
             ))}
             {task.notes?.length === 0 && <div className="text-center py-4 text-gray-400 text-sm">{t('task.noNotes')}</div>}

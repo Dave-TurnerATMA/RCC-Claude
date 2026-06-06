@@ -19,15 +19,26 @@ router.get('/:teamId/dashboard', (req, res) => {
   const overdueCount = overdueRows.length;
   const totalDaysOverdue = overdueRows.reduce((s, r) => s + (r.days_overdue || 0), 0);
 
+  // Top performers based on crew_participation records (confirmed) on completed tasks
   const topPerformers = db.prepare(`
-    SELECT u.name as user_name, u.id, COUNT(*) as task_count
-    FROM scheduled_tasks st
-    JOIN task_crew tc ON tc.scheduled_task_id = st.id
-    JOIN users u ON u.id = tc.user_id
-    WHERE st.team_id = ? AND st.state = 'completed' AND st.completed_at >= datetime('now', '-30 days')
+    SELECT u.name as user_name, u.id,
+      COUNT(DISTINCT CASE WHEN st.responsible_user_id = u.id THEN st.id END) as responsible_count,
+      COUNT(DISTINCT CASE WHEN cp.user_id = u.id THEN st.id END) as crew_count,
+      (
+        COUNT(DISTINCT CASE WHEN st.responsible_user_id = u.id THEN st.id END) +
+        COUNT(DISTINCT CASE WHEN cp.user_id = u.id THEN st.id END)
+      ) as task_count
+    FROM users u
+    LEFT JOIN scheduled_tasks st ON (st.responsible_user_id = u.id OR 1=1)
+      AND st.team_id = ? AND st.state = 'completed'
+      AND st.completed_at >= datetime('now', '-30 days')
+    LEFT JOIN crew_participation cp ON cp.scheduled_task_id = st.id
+      AND cp.user_id = u.id AND cp.status = 'confirmed'
+    WHERE u.team_id = ?
     GROUP BY u.id, u.name
+    HAVING task_count > 0
     ORDER BY task_count DESC LIMIT 10
-  `).all(teamId);
+  `).all(teamId, teamId);
 
   const activityByDay = db.prepare(`
     SELECT date(completed_at) as date, COUNT(*) as count

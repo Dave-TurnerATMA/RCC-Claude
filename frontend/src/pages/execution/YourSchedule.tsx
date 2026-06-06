@@ -150,10 +150,10 @@ function MyTaskCard({ task, isOverdue, currentUserId, onComplete, onDetails, onR
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-medium">Responsible</span>
           )}
           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{t(`type.${task.type}`)}</span>
-          {task.crew_type === 'open_optional' && (
+          {task.participants === 'open_optional' && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">Open – Optional</span>
           )}
-          {task.crew_type === 'all_expected' && (
+          {task.participants === 'all_expected' && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-medium">All – Expected</span>
           )}
         </div>

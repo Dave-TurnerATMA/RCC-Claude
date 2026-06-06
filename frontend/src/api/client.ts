@@ -26,20 +26,19 @@ export const api = {
   createUser: (teamId: number, data: any) => api.post(`/teams/${teamId}/users`, data),
   updateUser: (teamId: number, userId: number, data: any) => api.put(`/teams/${teamId}/users/${userId}`, data),
 
-  // Categories
-  getCategories: (teamId: number) => api.get(`/teams/${teamId}/required-task-categories`),
-  createCategory: (teamId: number, data: any) => api.post(`/teams/${teamId}/required-task-categories`, data),
-  updateCategory: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/required-task-categories/${id}`, data),
-  deleteCategory: (teamId: number, id: number) => api.delete(`/teams/${teamId}/required-task-categories/${id}`),
+  // Main Tasks (headings)
+  getMainTasks: (teamId: number) => api.get(`/teams/${teamId}/main-tasks`),
+  createMainTask: (teamId: number, data: any) => api.post(`/teams/${teamId}/main-tasks`, data),
+  updateMainTask: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/main-tasks/${id}`, data),
+  deleteMainTask: (teamId: number, id: number) => api.delete(`/teams/${teamId}/main-tasks/${id}`),
 
-  // Required Tasks
+  // Required Tasks (sub-tasks)
   getRequiredTasks: (teamId: number) => api.get(`/teams/${teamId}/required-tasks`),
   getTaskSummary: (teamId: number, id: number) => api.get(`/teams/${teamId}/required-tasks/${id}/summary`),
   getRequiredTaskLogs: (teamId: number, id: number) => api.get(`/teams/${teamId}/required-tasks/${id}/logs`),
   createRequiredTask: (teamId: number, data: any) => api.post(`/teams/${teamId}/required-tasks`, data),
   updateRequiredTask: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/required-tasks/${id}`, data),
   archiveRequiredTask: (teamId: number, id: number, data?: any) => api.post(`/teams/${teamId}/required-tasks/${id}/archive`, data || {}),
-  deleteRequiredTask: (teamId: number, id: number) => api.delete(`/teams/${teamId}/required-tasks/${id}`),
 
   // Scheduled Tasks
   getScheduledTasks: (teamId: number, params: Record<string, string> = {}) => {
@@ -55,12 +54,25 @@ export const api = {
   updateScheduledTask: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/scheduled-tasks/${id}`, data),
   completeTask: (teamId: number, id: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${id}/complete`, data),
   updateProgress: (teamId: number, id: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${id}/progress`, data),
-  addCrew: (teamId: number, taskId: number, userId: number) => api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/crew`, { user_id: userId }),
-  removeCrew: (teamId: number, taskId: number, userId: number) => api.delete(`/teams/${teamId}/scheduled-tasks/${taskId}/crew/${userId}`),
+
+  // Crew
+  addCrewMember: (teamId: number, taskId: number, data: { user_id: number; source?: string; added_by_user_id?: number }) =>
+    api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/crew`, data),
+  removeCrewMember: (teamId: number, taskId: number, userId: number) =>
+    api.delete(`/teams/${teamId}/scheduled-tasks/${taskId}/crew/${userId}`),
+  confirmCrewParticipation: (teamId: number, taskId: number, userId: number) =>
+    api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/crew/${userId}/confirm`, {}),
+
+  // Legacy aliases
+  addCrew: (teamId: number, taskId: number, userId: number) =>
+    api.addCrewMember(teamId, taskId, { user_id: userId, source: 'manually_added' }),
+  removeCrew: (teamId: number, taskId: number, userId: number) =>
+    api.removeCrewMember(teamId, taskId, userId),
+
   addNote: (teamId: number, taskId: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/notes`, data),
   requestTakeover: (teamId: number, taskId: number, data: any) => api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/request-takeover`, data),
-  updateStepCheck: (teamId: number, taskId: number, stepId: number, checked: boolean) =>
-    api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/step-checks`, { step_id: stepId, checked }),
+  updateStepCheck: (teamId: number, taskId: number, stepId: number, checked: boolean, userId?: number) =>
+    api.post(`/teams/${teamId}/scheduled-tasks/${taskId}/step-checks`, { step_id: stepId, checked, user_id: userId }),
 
   // Equipment
   getEquipment: (teamId: number) => api.get(`/teams/${teamId}/equipment`),

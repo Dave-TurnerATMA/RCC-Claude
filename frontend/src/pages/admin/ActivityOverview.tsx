@@ -4,7 +4,7 @@ import { api } from '../../api/client';
 import { useApp } from '../../contexts/AppContext';
 import StateBadge from '../../components/StateBadge';
 import TaskManageModal from '../../components/TaskManageModal';
-import { RequiredTaskForm } from './RequiredTasks';
+import { SubTaskForm } from './PlannedTasks';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -35,7 +35,6 @@ function getRtDisplayState(rt: any, stsByRtId: Record<number, any[]>): { label: 
     (a.scheduled_date || '').localeCompare(b.scheduled_date || '')
   );
   if (sts.length === 0) {
-    // No active STs — use completion_count to distinguish completed vs never-started
     if (rt.completion_count > 0) return { label: 'Completed', color: 'green' };
     return { label: 'Scheduled', color: 'purple' };
   }
@@ -60,22 +59,22 @@ interface RtRowProps {
   rt: any;
   displayState: { label: string; color: string };
   effectiveDate: string;
-  catName?: string;
+  groupName?: string;
   showDate: boolean;
-  showCategory: boolean;
+  showGroup: boolean;
   onClick: () => void;
 }
 
-function RtRow({ rt, displayState, effectiveDate, catName, showDate, showCategory, onClick }: RtRowProps) {
+function RtRow({ rt, displayState, effectiveDate, groupName, showDate, showGroup, onClick }: RtRowProps) {
   return (
     <div
       onClick={onClick}
       className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
     >
-      <span className="text-sm flex-shrink-0 w-5 text-center">{rt.is_recurring ? '🔄' : '📌'}</span>
+      <span className="text-sm flex-shrink-0 w-5 text-center">{rt.type === 'recurring' ? '🔄' : '📌'}</span>
       <span className="text-sm text-gray-900 flex-1 truncate min-w-0">{rt.short_description}</span>
-      {showCategory && catName && (
-        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">{catName}</span>
+      {showGroup && groupName && (
+        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">{groupName}</span>
       )}
       {showDate && effectiveDate && (
         <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(effectiveDate)}</span>
@@ -90,13 +89,12 @@ export default function ActivityOverview() {
   const { team } = useApp();
   const [view, setView] = useState<'planned' | 'adhoc'>('planned');
   const [sortByDate, setSortByDate] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [requiredTasks, setRequiredTasks] = useState<any[]>([]);
+  const [mainTasks, setMainTasks] = useState<any[]>([]);
   const [activeSTs, setActiveSTs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [editTask, setEditTask] = useState<any>(null);
   const [manageTask, setManageTask] = useState<any>(null);
 
@@ -104,19 +102,17 @@ export default function ActivityOverview() {
     if (!team) return;
     setLoading(true);
     try {
-      const [cats, rts, sts, usersData, eqData] = await Promise.all([
-        api.getCategories(team.id),
-        api.getRequiredTasks(team.id),
+      const [mts, sts, usersData, eqData] = await Promise.all([
+        api.getMainTasks(team.id),
         api.getScheduledTasks(team.id),
         api.getUsers(team.id),
         api.getEquipment(team.id),
       ]);
-      setCategories(cats);
-      setRequiredTasks(rts);
+      setMainTasks(mts);
       setActiveSTs(sts);
       setUsers(usersData.filter((u: any) => u.status === 'active'));
       setEquipment(eqData);
-      setExpandedCategories(new Set(cats.map((c: any) => c.id)));
+      setExpandedGroups(new Set(mts.map((mt: any) => mt.id)));
     } finally {
       setLoading(false);
     }
@@ -124,6 +120,7 @@ export default function ActivityOverview() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Build stsByRtId from active STs
   const stsByRtId = activeSTs.reduce((acc: Record<number, any[]>, st: any) => {
     if (st.required_task_id) {
       if (!acc[st.required_task_id]) acc[st.required_task_id] = [];
@@ -132,15 +129,18 @@ export default function ActivityOverview() {
     return acc;
   }, {});
 
-  const toggleCategory = (id: number) => {
-    setExpandedCategories(prev => {
+  const toggleGroup = (id: number) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
-  const sortedByDateRts = [...requiredTasks].sort((a, b) => {
+  // Flatten all required tasks from main_tasks
+  const allRequiredTasks = mainTasks.flatMap((mt: any) => (mt.sub_tasks || []).map((rt: any) => ({ ...rt, _groupName: mt.short_description })));
+
+  const sortedByDateRts = [...allRequiredTasks].sort((a, b) => {
     const da = getRtEffectiveDate(a, stsByRtId);
     const db = getRtEffectiveDate(b, stsByRtId);
     if (!da && !db) return 0;
@@ -149,13 +149,9 @@ export default function ActivityOverview() {
     return da.localeCompare(db);
   });
 
-  const displayRts = sortByDate ? sortedByDateRts : requiredTasks;
-
   const adhocTasks = activeSTs
     .filter((st: any) => !st.required_task_id)
     .sort((a: any, b: any) => (a.scheduled_date || '').localeCompare(b.scheduled_date || ''));
-
-  const catMap = Object.fromEntries(categories.map((c: any) => [c.id, c.name]));
 
   return (
     <div className="flex flex-col">
@@ -205,18 +201,18 @@ export default function ActivityOverview() {
         ) : view === 'planned' ? (
           sortByDate ? (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              {displayRts.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 text-sm">No required tasks found</div>
+              {sortedByDateRts.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-sm">No planned tasks found</div>
               ) : (
-                displayRts.map(rt => (
+                sortedByDateRts.map(rt => (
                   <RtRow
                     key={rt.id}
                     rt={rt}
                     displayState={getRtDisplayState(rt, stsByRtId)}
                     effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
-                    catName={catMap[rt.category_id]}
+                    groupName={rt._groupName}
                     showDate
-                    showCategory
+                    showGroup
                     onClick={() => setEditTask(rt)}
                   />
                 ))
@@ -224,30 +220,30 @@ export default function ActivityOverview() {
             </div>
           ) : (
             <>
-              {categories.map(cat => {
-                const catTasks = displayRts.filter((t: any) => t.category_id === cat.id);
-                if (catTasks.length === 0) return null;
-                const expanded = expandedCategories.has(cat.id);
+              {mainTasks.map(mt => {
+                const subTasks = mt.sub_tasks || [];
+                if (subTasks.length === 0) return null;
+                const expanded = expandedGroups.has(mt.id);
                 return (
-                  <div key={cat.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div key={mt.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <button
-                      onClick={() => toggleCategory(cat.id)}
+                      onClick={() => toggleGroup(mt.id)}
                       className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100 text-left"
                     >
-                      <span className="text-xs font-bold text-gray-700 flex-1">{cat.name}</span>
-                      <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">{catTasks.length}</span>
+                      <span className="text-xs font-bold text-gray-700 flex-1">{mt.short_description}</span>
+                      <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">{subTasks.length}</span>
                       <span className="text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
                     </button>
                     {expanded && (
                       <div>
-                        {catTasks.map((rt: any) => (
+                        {subTasks.map((rt: any) => (
                           <RtRow
                             key={rt.id}
                             rt={rt}
                             displayState={getRtDisplayState(rt, stsByRtId)}
                             effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
                             showDate={false}
-                            showCategory={false}
+                            showGroup={false}
                             onClick={() => setEditTask(rt)}
                           />
                         ))}
@@ -256,34 +252,11 @@ export default function ActivityOverview() {
                   </div>
                 );
               })}
-              {displayRts.filter((t: any) => !t.category_id).length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-500 flex-1">Uncategorized</span>
-                    <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">
-                      {displayRts.filter((t: any) => !t.category_id).length}
-                    </span>
-                  </div>
-                  <div>
-                    {displayRts.filter((t: any) => !t.category_id).map((rt: any) => (
-                      <RtRow
-                        key={rt.id}
-                        rt={rt}
-                        displayState={getRtDisplayState(rt, stsByRtId)}
-                        effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
-                        showDate={false}
-                        showCategory={false}
-                        onClick={() => setEditTask(rt)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {requiredTasks.length === 0 && (
+              {allRequiredTasks.length === 0 && (
                 <div className="text-center py-16">
                   <div className="text-5xl mb-3">📋</div>
-                  <div className="font-medium text-gray-700">No required tasks yet</div>
-                  <div className="text-sm text-gray-500 mt-1">Add required tasks to see them here</div>
+                  <div className="font-medium text-gray-700">No planned tasks yet</div>
+                  <div className="text-sm text-gray-500 mt-1">Add tasks to see them here</div>
                 </div>
               )}
             </>
@@ -294,7 +267,7 @@ export default function ActivityOverview() {
               <div className="text-center py-12">
                 <div className="text-4xl mb-3">✅</div>
                 <div className="font-medium text-gray-700">No adhoc tasks</div>
-                <div className="text-sm text-gray-500 mt-1">All active tasks are linked to a required task</div>
+                <div className="text-sm text-gray-500 mt-1">All active tasks are linked to a planned task</div>
               </div>
             ) : (
               adhocTasks.map((st: any) => (
@@ -319,11 +292,11 @@ export default function ActivityOverview() {
       </div>
 
       {editTask && (
-        <RequiredTaskForm
+        <SubTaskForm
           task={editTask}
           users={users}
           equipment={equipment}
-          categories={categories}
+          mainTasks={mainTasks}
           onClose={() => { setEditTask(null); load(); }}
         />
       )}

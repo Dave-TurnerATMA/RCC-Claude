@@ -103,7 +103,7 @@ function HistoryDetailModal({ task, onClose }: { task: any; onClose: () => void 
     if (!note.trim() || !team || !user) return;
     setSaving(true);
     try {
-      await api.addNote(team.id, taskData.id, { user_id: user.id, note });
+      await api.addNote(team.id, taskData.id, { user_id: user.id, note_text: note });
       setNote('');
       const updated = await api.getScheduledTask(team.id, taskData.id);
       setTaskData(updated);
@@ -246,7 +246,7 @@ function HistoryDetailModal({ task, onClose }: { task: any; onClose: () => void 
                 <span className="text-xs font-medium text-gray-900">{n.user_name || 'Unknown'}</span>
                 <span className="text-xs text-gray-400">{new Date(n.created_at).toLocaleDateString()}</span>
               </div>
-              <p className="text-sm text-gray-700">{n.note}</p>
+              <p className="text-sm text-gray-700">{n.note_text || n.note}</p>
             </div>
           ))}
           <div className="border-t pt-3">
