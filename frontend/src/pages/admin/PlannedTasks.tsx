@@ -740,9 +740,21 @@ function SubTaskDetail({ task, onClose }: { task: any; onClose: () => void }) {
             <div className="bg-gray-50 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-0.5">Last Done</div>
               <div className="font-medium">
-                {task.last_completed_at ? new Date(task.last_completed_at).toLocaleDateString() : 'Never'}
+                {task.last_completed_scheduled_date
+                  ? new Date(task.last_completed_scheduled_date + 'T00:00:00').toLocaleDateString()
+                  : 'Never'}
               </div>
             </div>
+            {task.type === 'recurring' && (
+              <div className="bg-gray-50 rounded-xl p-3">
+                <div className="text-xs text-gray-500 mb-0.5">Next Time</div>
+                <div className="font-medium">
+                  {task.next_scheduled_date
+                    ? new Date(task.next_scheduled_date + 'T00:00:00').toLocaleDateString()
+                    : '—'}
+                </div>
+              </div>
+            )}
           </div>
           {(task.crew_defaults || []).length > 0 && (
             <div>
