@@ -47,12 +47,8 @@ function getRtDisplayState(rt: any, stsByRtId: Record<number, any[]>): { label: 
   return { label: current.state, color: 'gray' };
 }
 
-function getRtEffectiveDate(rt: any, stsByRtId: Record<number, any[]>): string {
-  const sts = stsByRtId[rt.id] || [];
-  const earliest = [...sts]
-    .filter((s: any) => s.scheduled_date)
-    .sort((a: any, b: any) => a.scheduled_date.localeCompare(b.scheduled_date))[0];
-  return earliest?.scheduled_date || rt.scheduled_date || '';
+function getRtEffectiveDate(rt: any): string {
+  return rt.next_scheduled_date || rt.scheduled_date || '';
 }
 
 interface RtRowProps {
@@ -66,6 +62,10 @@ interface RtRowProps {
 }
 
 function RtRow({ rt, displayState, effectiveDate, groupName, showDate, showGroup, onClick }: RtRowProps) {
+  const showLastNext = rt.type === 'recurring' && rt.completion_count > 0;
+  const lastDate: string | null = showLastNext ? (rt.last_completed_scheduled_date || null) : null;
+  const nextDate: string | null = showLastNext ? (rt.next_scheduled_date || null) : null;
+
   return (
     <div
       onClick={onClick}
@@ -76,9 +76,14 @@ function RtRow({ rt, displayState, effectiveDate, groupName, showDate, showGroup
       {showGroup && groupName && (
         <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">{groupName}</span>
       )}
-      {showDate && effectiveDate && (
+      {(lastDate || nextDate) ? (
+        <span className="text-xs text-gray-400 flex-shrink-0 flex gap-1.5">
+          {lastDate && <span>↩ {fmtDate(lastDate)}</span>}
+          {nextDate && <span>→ {fmtDate(nextDate)}</span>}
+        </span>
+      ) : showDate && effectiveDate ? (
         <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(effectiveDate)}</span>
-      )}
+      ) : null}
       <DisplayStateBadge label={displayState.label} color={displayState.color} />
     </div>
   );
@@ -141,8 +146,8 @@ export default function ActivityOverview() {
   const allRequiredTasks = mainTasks.flatMap((mt: any) => (mt.sub_tasks || []).map((rt: any) => ({ ...rt, _groupName: mt.short_description })));
 
   const sortedByDateRts = [...allRequiredTasks].sort((a, b) => {
-    const da = getRtEffectiveDate(a, stsByRtId);
-    const db = getRtEffectiveDate(b, stsByRtId);
+    const da = getRtEffectiveDate(a);
+    const db = getRtEffectiveDate(b);
     if (!da && !db) return 0;
     if (!da) return 1;
     if (!db) return -1;
@@ -209,7 +214,7 @@ export default function ActivityOverview() {
                     key={rt.id}
                     rt={rt}
                     displayState={getRtDisplayState(rt, stsByRtId)}
-                    effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
+                    effectiveDate={getRtEffectiveDate(rt)}
                     groupName={rt._groupName}
                     showDate
                     showGroup
@@ -241,7 +246,7 @@ export default function ActivityOverview() {
                             key={rt.id}
                             rt={rt}
                             displayState={getRtDisplayState(rt, stsByRtId)}
-                            effectiveDate={getRtEffectiveDate(rt, stsByRtId)}
+                            effectiveDate={getRtEffectiveDate(rt)}
                             showDate={false}
                             showGroup={false}
                             onClick={() => setEditTask(rt)}

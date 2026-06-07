@@ -204,7 +204,14 @@ function SubTaskRow({ task, onView, onEdit, onArchive, onScheduled }: any) {
         )}
         {task.estimate_hours && <span>⏱ {task.estimate_hours}h est.</span>}
         {task.completion_count > 0 && <span>✅ {task.completion_count} done</span>}
-        {task.scheduled_date && <span>📅 {new Date(task.scheduled_date + 'T00:00:00').toLocaleDateString()}</span>}
+        {isRecurring && task.completion_count > 0 ? (
+          <>
+            {task.last_completed_scheduled_date && <span>↩ {new Date(task.last_completed_scheduled_date + 'T00:00:00').toLocaleDateString()}</span>}
+            {task.next_scheduled_date && <span>→ {new Date(task.next_scheduled_date + 'T00:00:00').toLocaleDateString()}</span>}
+          </>
+        ) : task.scheduled_date ? (
+          <span>📅 {new Date(task.scheduled_date + 'T00:00:00').toLocaleDateString()}</span>
+        ) : null}
         {task.responsible_user_name && <span>👤 {task.responsible_user_name}</span>}
       </div>
       <div className="flex gap-2 flex-wrap">

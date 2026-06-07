@@ -39,7 +39,9 @@ router.get('/:teamId/main-tasks', (req, res) => {
         (SELECT COUNT(*) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as completion_count,
         (SELECT MAX(st.completed_at) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as last_completed_at,
         (SELECT AVG(st.actual_hours) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed' AND st.actual_hours IS NOT NULL) as avg_effort,
-        (SELECT AVG((SELECT COUNT(*) FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.status != 'declined')) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as avg_crew_size
+        (SELECT AVG((SELECT COUNT(*) FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.status != 'declined')) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as avg_crew_size,
+        (SELECT st.scheduled_date FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed' ORDER BY st.completed_at DESC LIMIT 1) as last_completed_scheduled_date,
+        (SELECT st.scheduled_date FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state IN ('pending','planned') ORDER BY st.scheduled_date ASC LIMIT 1) as next_scheduled_date
       FROM required_tasks rt
       LEFT JOIN users u ON rt.default_responsible_user_id = u.id
       WHERE rt.main_task_id = ? AND rt.team_id = ? AND rt.is_archived = 0
@@ -87,7 +89,9 @@ router.get('/:teamId/required-tasks', (req, res) => {
       (SELECT COUNT(*) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as completion_count,
       (SELECT MAX(st.completed_at) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as last_completed_at,
       (SELECT AVG(st.actual_hours) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed' AND st.actual_hours IS NOT NULL) as avg_effort,
-      (SELECT AVG((SELECT COUNT(*) FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.status != 'declined')) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as avg_crew_size
+      (SELECT AVG((SELECT COUNT(*) FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.status != 'declined')) FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed') as avg_crew_size,
+      (SELECT st.scheduled_date FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state = 'completed' ORDER BY st.completed_at DESC LIMIT 1) as last_completed_scheduled_date,
+      (SELECT st.scheduled_date FROM scheduled_tasks st WHERE st.required_task_id = rt.id AND st.state IN ('pending','planned') ORDER BY st.scheduled_date ASC LIMIT 1) as next_scheduled_date
     FROM required_tasks rt
     LEFT JOIN users u ON rt.default_responsible_user_id = u.id
     LEFT JOIN main_tasks mt ON rt.main_task_id = mt.id
