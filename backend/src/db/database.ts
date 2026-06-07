@@ -47,6 +47,7 @@ export function initializeDatabase() {
       frequency_days INTEGER,
       planned_instances INTEGER DEFAULT 2,
       top_tips TEXT,
+      participants TEXT NOT NULL DEFAULT 'crew' CHECK(participants IN ('crew','none','open_optional','all_expected')),
       origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('coach','manual')),
       is_archived INTEGER DEFAULT 0,
       created_by_user_id INTEGER REFERENCES users(id),
@@ -167,6 +168,9 @@ export function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Migrations — safe to run on any existing DB
+  try { db.exec("ALTER TABLE required_tasks ADD COLUMN participants TEXT NOT NULL DEFAULT 'crew' CHECK(participants IN ('crew','none','open_optional','all_expected'))"); } catch {}
 }
 
 export default db;

@@ -102,7 +102,7 @@ router.post('/:teamId/required-tasks', (req, res) => {
   const {
     short_description, task_overview, priority, type, scheduled_date,
     default_responsible_user_id, estimate_hours, frequency_days,
-    planned_instances, top_tips, main_task_id, created_by_user_id, origin, steps, crew_default_ids
+    planned_instances, top_tips, participants, main_task_id, created_by_user_id, origin, steps, crew_default_ids
   } = req.body;
 
   if (!short_description || !task_overview) return res.status(400).json({ error: 'short_description and task_overview required' });
@@ -111,14 +111,14 @@ router.post('/:teamId/required-tasks', (req, res) => {
   const id = db.prepare(`
     INSERT INTO required_tasks (team_id, main_task_id, short_description, task_overview, priority, type,
       scheduled_date, default_responsible_user_id, estimate_hours, frequency_days,
-      planned_instances, top_tips, origin, created_by_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      planned_instances, top_tips, participants, origin, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.params.teamId, main_task_id || null, short_description, task_overview,
     priority || 'medium', type, scheduled_date || null,
     default_responsible_user_id || null, estimate_hours || null,
     frequency_days || null, planned_instances || 2, top_tips || null,
-    origin || 'manual', created_by_user_id || null
+    participants || 'crew', origin || 'manual', created_by_user_id || null
   ).lastInsertRowid as number;
 
   if (Array.isArray(crew_default_ids)) {
@@ -143,7 +143,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
   const {
     short_description, task_overview, priority, scheduled_date,
     default_responsible_user_id, estimate_hours, frequency_days,
-    planned_instances, top_tips, main_task_id, updated_by, steps, crew_default_ids
+    planned_instances, top_tips, participants, main_task_id, updated_by, steps, crew_default_ids
   } = req.body;
 
   const existing = db.prepare('SELECT * FROM required_tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.params.teamId) as any;
@@ -193,6 +193,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
       frequency_days = COALESCE(?, frequency_days),
       planned_instances = COALESCE(?, planned_instances),
       top_tips = COALESCE(?, top_tips),
+      participants = COALESCE(?, participants),
       updated_at = datetime('now')
     WHERE id = ? AND team_id = ?
   `).run(
@@ -205,6 +206,7 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
     default_responsible_user_id !== undefined ? default_responsible_user_id : null,
     estimate_hours ?? null, frequency_days ?? null,
     planned_instances ?? null, top_tips ?? null,
+    participants ?? null,
     req.params.id, req.params.teamId
   );
 
