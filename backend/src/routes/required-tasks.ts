@@ -218,6 +218,11 @@ router.put('/:teamId/required-tasks/:id', (req, res) => {
   }
   if (Array.isArray(steps)) saveSteps(Number(req.params.id), steps);
 
+  if (short_description) {
+    db.prepare("UPDATE scheduled_tasks SET short_description=? WHERE required_task_id=?")
+      .run(short_description, req.params.id);
+  }
+
   if (changes.length > 0) {
     db.prepare('INSERT INTO required_task_logs (required_task_id, user_id, change_description) VALUES (?, ?, ?)')
       .run(req.params.id, updated_by || null, changes.join('; '));
