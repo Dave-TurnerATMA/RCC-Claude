@@ -1,5 +1,28 @@
 # EVCA Spreadsheet Analysis System
 
+## Post-Load Merge Step (IMPORTANT — do this after all tabs verified)
+
+After the import program has loaded all tabs and the user has verified each load,
+a final merge step is required:
+
+**Merge `evca_risk_summary` into `evca_hazards`**
+
+`evca_risk_summary` (from Tab 1, Block C) and `evca_hazards` (from Tab 3) are loaded
+as separate tables during the tab-by-tab import. Once all data is verified:
+
+1. ALTER `evca_hazards` to add the 11 risk rating columns:
+   risk_management, health, water_and_sanitation, shelter_housing, food_and_nutrition,
+   social_cohesion, inclusion, economic_opportunity, infrastructure_services,
+   natural_resource_management, connectedness
+
+2. UPDATE `evca_hazards` SET each rating column from the matching `evca_risk_summary` row
+   (matched on assessment_id + hazard_number via evca_hazards.id = evca_risk_summary.hazard_id)
+
+3. DROP TABLE `evca_risk_summary` once merge is confirmed
+
+The two tables are kept separate during load so each tab can be verified independently
+before the merge collapses them into a single record per hazard.
+
 This subdirectory contains tools for analysing EVCA (Enhanced Vulnerability and Capacity Assessment) spreadsheets used by PMI (Indonesian Red Cross) and other Red Cross/Red Crescent National Societies.
 
 ## Stack
