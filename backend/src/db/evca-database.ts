@@ -1,8 +1,21 @@
 import db from './database';
 
 export function initializeEvcaDatabase(): void {
+  // evca_spreadsheet_loads must be created first — data tables FK to it
   db.exec(`
-    -- ── Reference / lookup tables ────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS evca_spreadsheet_loads (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename         TEXT    NOT NULL,
+        stored_filename  TEXT,
+        uploaded_at      DATETIME DEFAULT (datetime('now')),
+        status           TEXT    NOT NULL DEFAULT 'pending'
+                             CHECK(status IN ('pending','processing','success','failure')),
+        report           TEXT
+    );
+  `);
+
+  db.exec(`
+    -- ── Reference / lookup tables (no load_id) ───────────────────────────────
 
     CREATE TABLE IF NOT EXISTS evca_dimensions (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,10 +79,11 @@ export function initializeEvcaDatabase(): void {
         name_en          TEXT    NOT NULL
     );
 
-    -- ── Assessment record (Tab 1) ─────────────────────────────────────────────
+    -- ── Data tables — include load_id for new databases ───────────────────────
 
     CREATE TABLE IF NOT EXISTS evca_assessments (
         id                              INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id                         INTEGER REFERENCES evca_spreadsheet_loads(id),
         village_name                    TEXT    NOT NULL,
         district                        TEXT,
         province                        TEXT,
@@ -92,10 +106,9 @@ export function initializeEvcaDatabase(): void {
         updated_at                      DATETIME DEFAULT (datetime('now'))
     );
 
-    -- ── Tab 2: Community background ───────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_community_context (
         id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id                  INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id            INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
         community_description    TEXT,
         evca_participants_male   INTEGER,
@@ -113,6 +126,7 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_population (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id           INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id     INTEGER NOT NULL REFERENCES evca_assessments(id),
         age_group         TEXT    NOT NULL CHECK(age_group IN ('0_5','6_17','18_65','66_plus')),
         male_count        INTEGER,
@@ -122,10 +136,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(assessment_id, age_group)
     );
 
-    -- ── Tab 3: Hazards ────────────────────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_hazards (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id           INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id     INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_number     INTEGER NOT NULL CHECK(hazard_number IN (1,2,3)),
         hazard_name       TEXT    NOT NULL,
@@ -138,10 +151,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(assessment_id, hazard_number)
     );
 
-    -- ── Tab 4: Vulnerability ──────────────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_vulnerable_groups (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id               INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id         INTEGER NOT NULL REFERENCES evca_assessments(id),
         group_number          INTEGER NOT NULL CHECK(group_number IN (1,2,3,4)),
         group_name            TEXT    NOT NULL,
@@ -151,6 +163,7 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_vulnerability_ratings (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id               INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id         INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_id             INTEGER NOT NULL REFERENCES evca_hazards(id),
         dimension_number      INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 8),
@@ -161,10 +174,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(hazard_id, dimension_number)
     );
 
-    -- ── Tab 5: Capacity ───────────────────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_capacity_ratings (
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id              INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id        INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_id            INTEGER NOT NULL REFERENCES evca_hazards(id),
         dimension_number     INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 8),
@@ -174,10 +186,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(hazard_id, dimension_number)
     );
 
-    -- ── Tab 6: Social dimensions ──────────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_social_dimensions (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id       INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id INTEGER NOT NULL REFERENCES evca_assessments(id),
         dimension     TEXT    NOT NULL CHECK(dimension IN ('social_cohesion','inclusion','connectedness')),
         description   TEXT,
@@ -186,10 +197,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(assessment_id, dimension)
     );
 
-    -- ── Tab 7: Risk ratings (computed) ────────────────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_risk_ratings (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id          INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id    INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_id        INTEGER NOT NULL REFERENCES evca_hazards(id),
         dimension_number INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 11),
@@ -199,6 +209,7 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_risk_summary (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id          INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id    INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_id        INTEGER NOT NULL REFERENCES evca_hazards(id),
         dimension_number INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 11),
@@ -206,10 +217,9 @@ export function initializeEvcaDatabase(): void {
         UNIQUE(hazard_id, dimension_number)
     );
 
-    -- ── Tabs 8-10: Analysis, Action Plan, Priority ────────────────────────────
-
     CREATE TABLE IF NOT EXISTS evca_risk_analysis (
         id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id                INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id          INTEGER NOT NULL REFERENCES evca_assessments(id),
         hazard_id              INTEGER NOT NULL REFERENCES evca_hazards(id),
         consolidated_dimension INTEGER NOT NULL CHECK(consolidated_dimension BETWEEN 1 AND 7),
@@ -221,12 +231,14 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_overall_analysis (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id           INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id     INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
         overall_narrative TEXT    NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS evca_action_items (
         id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id                    INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id              INTEGER NOT NULL REFERENCES evca_assessments(id),
         item_order                 INTEGER NOT NULL,
         priority_risk_description  TEXT    NOT NULL,
@@ -240,6 +252,7 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_action_validation (
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id              INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id        INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
         community_rep_name   TEXT,
         community_rep_signed INTEGER DEFAULT 0,
@@ -254,6 +267,7 @@ export function initializeEvcaDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS evca_priority_scores_flat (
         id                            INTEGER PRIMARY KEY AUTOINCREMENT,
+        load_id                       INTEGER REFERENCES evca_spreadsheet_loads(id),
         assessment_id                 INTEGER NOT NULL REFERENCES evca_assessments(id),
         action_item_id                INTEGER REFERENCES evca_action_items(id),
         activity_name                 TEXT    NOT NULL,
@@ -268,7 +282,22 @@ export function initializeEvcaDatabase(): void {
     );
   `);
 
+  // Migrations — add load_id to tables that existed before this column was introduced
+  const dataTables = [
+    'evca_assessments', 'evca_community_context', 'evca_population',
+    'evca_hazards', 'evca_vulnerable_groups', 'evca_vulnerability_ratings',
+    'evca_capacity_ratings', 'evca_social_dimensions', 'evca_risk_ratings',
+    'evca_risk_summary', 'evca_risk_analysis', 'evca_overall_analysis',
+    'evca_action_items', 'evca_action_validation', 'evca_priority_scores_flat',
+  ];
+  for (const t of dataTables) {
+    try {
+      db.exec(`ALTER TABLE ${t} ADD COLUMN load_id INTEGER REFERENCES evca_spreadsheet_loads(id)`);
+    } catch { /* column already exists */ }
+  }
+
   seedReferenceData();
+  seedTestData();
 }
 
 function seedReferenceData(): void {
@@ -346,4 +375,19 @@ function seedReferenceData(): void {
         (7, 'Mandat PMI',                                  'PMI mandate'),
         (8, 'Efektivitas/ketepatan/fungsi aksi',            'Effectiveness / appropriateness');
   `);
+}
+
+function seedTestData(): void {
+  const already = (db.prepare('SELECT COUNT(*) as n FROM evca_spreadsheet_loads').get() as any).n;
+  if (already > 0) return;
+
+  db.prepare(
+    `INSERT INTO evca_spreadsheet_loads (filename, stored_filename, status, report)
+     VALUES (?, ?, ?, ?)`
+  ).run(
+    'EVCA_Desa_Para_Lando.xlsx',
+    null,
+    'pending',
+    'Test record — no file stored. Use the upload form to load a real spreadsheet.'
+  );
 }
