@@ -592,3 +592,37 @@ VALUES
     (36, 'Perwakilan BPBD',               'BPBD rep name',              'E', 36, 'bpbd_rep_name',             'TEXT', 0, NULL, NULL),
     (36, 'Perwakilan Desa',               'Village rep name',           'G', 36, 'village_rep_name',          'TEXT', 0, NULL, NULL),
     (36, 'Perwakilan PMI Kabupaten/Kota', 'PMI rep name',               'I', 36, 'pmi_rep_name',              'TEXT', 0, NULL, NULL);
+
+
+-- ============================================================
+-- TAB 10  (sheet_index=9)  "Sheet1"  —  block 37
+-- ============================================================
+
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (37, 9, 'Sheet1', 'Priority Scoring Matrix',
+     'Matriks Prioritas', 'Priority Scoring Matrix',
+     'evca_priority_scores_flat', NULL, 'repeating',
+     'yellow #FFFF00 + blue-gray #E9EDF4 fills; thin borders; activity headers merged rows 2-3 per column',
+     'A2', 'T12', 2, 12, 'A', 'T', 0,
+     'Column-major layout (unique). Activity names in row 2 cols C-T (18 activities). Criteria labels col B rows 4-11; criterion numbers col A. Scores at intersection cells. Totals row 12 (formula). Import: iterate cols C-T; read activity name row 2; scores rows 4-11; one record per activity. Row 9 A-value is 9 (spreadsheet error, treat as criterion 6 Sustainability). Row 10 Mandat PMI: no scores entered. Col I SOP/SPD: no scores, total=0.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (37, 'Aktivitas',              'Activity name',           'A', 2,  'activity_name',                 'TEXT',    0, NULL, 'Row 2 = activity header; activity names in cols C-T'),
+    (37, 'Dana',                   'Funding',                 'B', 4,  'score_funding',                 'INTEGER', 0, NULL, 'Criterion row 4; scores in cols C-T of same row'),
+    (37, 'Jangka waktu',           'Timeframe',               'B', 5,  'score_timeframe',               'INTEGER', 0, NULL, NULL),
+    (37, 'Sumber daya lokal',      'Local resources',         'B', 6,  'score_local_resources',         'INTEGER', 0, NULL, NULL),
+    (37, 'Partisipasi masyarakat', 'Community participation', 'B', 7,  'score_community_participation', 'INTEGER', 0, NULL, NULL),
+    (37, 'Dukungan teknis',        'Govt technical support',  'B', 8,  'score_govt_support',            'INTEGER', 0, NULL, NULL),
+    (37, 'Keberlanjutan',          'Sustainability',           'B', 9,  'score_sustainability',          'INTEGER', 0, NULL, 'Cell A9=9 (error); treat as criterion 6'),
+    (37, 'Mandat PMI',             'PMI mandate',             'B', 10, 'score_pmi_mandate',             'INTEGER', 0, NULL, 'No scores entered in any activity column'),
+    (37, 'Epektivitas',            'Effectiveness',           'B', 11, 'score_effectiveness',           'INTEGER', 0, NULL, NULL),
+    (37, 'Total',                  'Total score',             'C', 12, 'total_score',                   'INTEGER', 1, NULL, 'Row 12 formula sum; read from spreadsheet');

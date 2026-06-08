@@ -1083,96 +1083,111 @@ VALUES
 
 ## Sheet 10 — "Sheet1" (Priority Scoring Matrix)
 
-### Description
-Activity prioritisation scoring matrix. Each action plan activity is scored against 8 criteria. Scores are summed to produce a priority ranking. The sheet appears to evaluate the top activities from the action plan.
+### Layout
 
-### Scoring Criteria (rows 4–11, column B)
-| # (col A) | Criterion (Indonesian) | English |
+| Rows | Content | Identification |
 |---|---|---|
-| 1 | Dana | Funding availability |
-| 2 | Jangka waktu | Timeframe feasibility |
-| 3 | Sumber daya lokal (Material, sarana) | Local resources (materials, facilities) |
-| 4 | Partisipasi masyarakat (Keterlibatan) | Community participation |
-| 5 | Dukungan teknis dari pemerintah daerah | Technical support from local government |
-| 9 | Keberlanjutan (Pemeliharaan dan penanganan) | Sustainability (maintenance and management) |
-| 7 | Mandat PMI | PMI mandate |
-| 8 | Efektivitas/ketepatan/fungsi aksi | Effectiveness/appropriateness/function |
+| 1 | Empty (no title row) | — |
+| 2–3 | Activity column headers (rows merged per column) | Yellow `#FFFF00` + blue-gray `#E9EDF4` fills; thin borders; A=No, B=Indikator, C–T = 18 activity names |
+| 4–11 | Criterion scoring rows | Same fills; thin borders; A=criterion#, B=criterion name, C–T=integer scores |
+| 12 | Total scores per activity | No fill, no borders; formula sum of rows 4–11 per column |
 
-### Activities Scored (column headers, row 2)
-| Column | Activity |
-|---|---|
-| C | Perlengkapan TDB (Emergency equipment) |
-| D | Pelatihan TDB (Emergency training) |
-| E | Penyusunan Rencana Kontinjensi di Masyarakat (Community contingency planning) |
-| F | Pembangunan Sarana Prasarana Sistem (System infrastructure development) |
-| G–H | Additional activities (names truncated in raw data) |
+Sheet name is "Sheet1" (not renamed in the template).
 
-### Example Scores (row 12 totals)
-| Activity | Total Score |
-|---|---|
-| Perlengkapan TDB | 30 |
-| Pelatihan TDB | 36 |
-| Kontinjensi (Community planning) | 41 |
-| Sistem Infrastructure | 35 |
-| Activity 5 | 49 |
-| Activity 6 | 55 |
+### Column-Major Structure
 
-### Proposed Tables
+This sheet is **column-major**: activities are columns (C–T), criteria are rows (4–11). Each cell at the intersection of an activity column and a criterion row holds an integer score. This is the inverse of the normal row-per-record layout used throughout Tabs 2–9.
+
+**Import pattern:** iterate columns C–T; for each column, read the activity name from row 2 and 8 scores from rows 4–11; write one record to `evca_priority_scores_flat`.
+
+### Activities Scored (row 2, columns C–T — 18 activities)
+
+| Col | Indonesian | English |
+|---|---|---|
+| C | Perlengkapan TDB | Emergency Equipment (TDB) |
+| D | Pelatihan TDB | Emergency Training |
+| E | Penyusunan Rencana Kontijensi di Masyarakat | Community Contingency Planning |
+| F | Pembangunan Sarana Prasarana Sistem Peringatan Dini | Early Warning System Infrastructure |
+| G | Kampanye Pengurangan Risiko Bencana | DRR Campaign |
+| H | Pembentukan Komite Penanggulangan Bencana | DRR Committee Formation |
+| I | Pembuatan Dokumen SOP SPD | SOP/SPD Document Creation *(no scores entered)* |
+| J | Sosialisasi Pengurangan Risiko Bencana | DRR Socialization |
+| K | Pembangunan MCK Umum yang ramah Difabel dan lingkungan | Disability-friendly Public Sanitation |
+| L | Sosialisasi PHBS | Healthy Behaviour Socialization (PHBS) |
+| M | Pelatihan Ekonomi Kreatif | Creative Economy Training |
+| N | Pembentukan Koperasi Bencana | Disaster Cooperative Formation |
+| O | Pembangunan Tembok Penahan Ombak | Seawall Construction |
+| P | Penanaman Pohon-Pohon di Pinggir Pantai | Coastal Tree Planting |
+| Q | Perbaikan Gorong-gorong | Drainage / Culvert Repair |
+| R | Pelatihan Pemanfaatan Hasil Pertanian | Agricultural Product Training |
+| S | Pembangunan Posko Siaga Bencana | Disaster Preparedness Post Construction |
+| T | Pengadaan Perahu Karet | Rubber Boat Procurement |
+
+### Scoring Criteria (rows 4–11, columns A–B)
+
+| Row | Cell A | Indonesian (B) | English | db_column |
+|---|---|---|---|---|
+| 4 | 1 | Dana | Funding availability | `score_funding` |
+| 5 | 2 | Jangka waktu | Timeframe feasibility | `score_timeframe` |
+| 6 | 3 | Sumber daya lokal (Material, sarana) | Local resources | `score_local_resources` |
+| 7 | 4 | Partisipasi masyarakat (Keterlibatan) | Community participation | `score_community_participation` |
+| 8 | 5 | Dukungan teknis dari pemerintah daerah | Government technical support | `score_govt_support` |
+| 9 | **9** | Keberlanjutan (Pemeliharaan dan penambahan) | Sustainability | `score_sustainability` |
+| 10 | 7 | Mandat PMI | PMI mandate | `score_pmi_mandate` |
+| 11 | 8 | Epektivitas/ketepatan/fungsi aksi | Effectiveness | `score_effectiveness` |
+
+> **Note:** Row 9 has criterion number `9` in cell A — this is a spreadsheet error; it should be `6`. Treat as criterion 6 (Sustainability) for import purposes.
+> **Note:** Row 10 (Mandat PMI) has no scores entered in any activity column. All `score_pmi_mandate` values are NULL.
+> **Note:** Col I (SOP/SPD Document) has no scores entered in any criterion row; total = 0.
+
+### Example Total Scores (row 12)
+
+| C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 30 | 36 | 41 | 35 | 49 | 55 | 0 | 48 | 33 | 49 | 41 | 56 | 31 | 53 | 34 | 51 | 33 | 31 |
+
+Highest priority: N=Pembentukan Koperasi Bencana (56), H=Pembentukan Komite (55), P=Coastal Tree Planting (53).
+
+### Schema
 
 ```sql
-CREATE TABLE evca_priority_criteria (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    criterion_number INTEGER NOT NULL,
-    name_id         TEXT    NOT NULL,   -- Indonesian name
-    name_en         TEXT    NOT NULL,   -- English name
-    UNIQUE(criterion_number)
-);
+-- evca_priority_criteria and evca_priority_scores_flat already defined in EVCA_schema.sql
+-- Reference data for evca_priority_criteria already in EVCA_reference.sql
+-- No additional tables required for Tab 10.
+```
 
--- Seed data:
--- (1, 'Dana', 'Funding availability')
--- (2, 'Jangka waktu', 'Timeframe feasibility')
--- (3, 'Sumber daya lokal', 'Local resources')
--- (4, 'Partisipasi masyarakat', 'Community participation')
--- (5, 'Dukungan teknis pemerintah', 'Government technical support')
--- (6, 'Keberlanjutan', 'Sustainability')
--- (7, 'Mandat PMI', 'PMI mandate')
--- (8, 'Efektivitas', 'Effectiveness')
+### Metadata SQL
 
-CREATE TABLE evca_priority_scores (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id       INTEGER NOT NULL REFERENCES evca_assessments(id),
-    action_item_id      INTEGER REFERENCES evca_action_items(id),
-    activity_name       TEXT    NOT NULL,   -- short name/label for the activity
-    criterion_number    INTEGER NOT NULL,
-    score               INTEGER,            -- numeric score for this criterion
-    UNIQUE(assessment_id, action_item_id, criterion_number)
-);
+```sql
+-- Block 37: Priority scoring matrix (rows 2–12, cols A–T)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (37, 9, 'Sheet1', 'Priority Scoring Matrix',
+     'Matriks Prioritas', 'Priority Scoring Matrix',
+     'evca_priority_scores_flat', NULL, 'repeating',
+     'yellow #FFFF00 + blue-gray #E9EDF4 fills; thin borders; activity headers merged rows 2-3 per column',
+     'A2', 'T12', 2, 12, 'A', 'T', 0,
+     'Column-major layout (unique). Activity names in row 2, cols C-T (18 activities). Criteria labels col B rows 4-11; criterion numbers col A. Scores at intersection cells. Totals row 12 (formula). Import: iterate cols C-T; read activity name row 2; scores rows 4-11; one record per activity. Row 9 A-value is 9 (spreadsheet error, treat as criterion 6 Sustainability). Row 10 Mandat PMI: no scores entered. Col I SOP/SPD: no scores, total=0.');
 
--- Or alternatively, store as a flat pivot with one row per activity:
-CREATE TABLE evca_priority_scores_flat (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id       INTEGER NOT NULL REFERENCES evca_assessments(id),
-    action_item_id      INTEGER REFERENCES evca_action_items(id),
-    activity_name       TEXT    NOT NULL,
-    score_funding               INTEGER,
-    score_timeframe             INTEGER,
-    score_local_resources       INTEGER,
-    score_community_participation INTEGER,
-    score_govt_support          INTEGER,
-    score_sustainability        INTEGER,
-    score_pmi_mandate           INTEGER,
-    score_effectiveness         INTEGER,
-    total_score         INTEGER GENERATED ALWAYS AS (
-        COALESCE(score_funding,0) +
-        COALESCE(score_timeframe,0) +
-        COALESCE(score_local_resources,0) +
-        COALESCE(score_community_participation,0) +
-        COALESCE(score_govt_support,0) +
-        COALESCE(score_sustainability,0) +
-        COALESCE(score_pmi_mandate,0) +
-        COALESCE(score_effectiveness,0)
-    ) STORED
-);
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (37, 'Aktivitas',             'Activity name',            'A', 2,  'activity_name',                  'TEXT',    0, NULL, 'Row 2 = activity header; A2="No", B2="Indikator"; activity names in cols C-T'),
+    (37, 'Dana',                  'Funding',                  'B', 4,  'score_funding',                  'INTEGER', 0, NULL, 'Criterion row 4; scores in cols C-T of same row'),
+    (37, 'Jangka waktu',          'Timeframe',                'B', 5,  'score_timeframe',                'INTEGER', 0, NULL, NULL),
+    (37, 'Sumber daya lokal',     'Local resources',          'B', 6,  'score_local_resources',          'INTEGER', 0, NULL, NULL),
+    (37, 'Partisipasi masyarakat','Community participation',  'B', 7,  'score_community_participation',  'INTEGER', 0, NULL, NULL),
+    (37, 'Dukungan teknis',       'Govt technical support',   'B', 8,  'score_govt_support',             'INTEGER', 0, NULL, NULL),
+    (37, 'Keberlanjutan',         'Sustainability',            'B', 9,  'score_sustainability',           'INTEGER', 0, NULL, 'Cell A9=9 (error); treat as criterion 6'),
+    (37, 'Mandat PMI',            'PMI mandate',              'B', 10, 'score_pmi_mandate',              'INTEGER', 0, NULL, 'No scores entered in any activity column'),
+    (37, 'Epektivitas',           'Effectiveness',            'B', 11, 'score_effectiveness',            'INTEGER', 0, NULL, NULL),
+    (37, 'Total',                 'Total score',              'C', 12, 'total_score',                    'INTEGER', 1, NULL, 'Row 12; formula sum; read from spreadsheet rather than recomputing');
 ```
 
 ---
