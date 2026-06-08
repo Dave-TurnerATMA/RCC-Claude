@@ -947,63 +947,136 @@ VALUES
 
 ## Sheet 9 — "9. Rencana Aksi" (Action Plan)
 
-### Description
-Priority action plan. For each identified priority risk, the assessor records the desired outcome, priority activities/outputs, required resources, technical support needs, schedule, and responsible party. The sheet ends with a validation block for signatures from 4 stakeholder representatives.
+### Layout
 
-### Columns (row 11 headers)
-| Indonesian | English |
-|---|---|
-| Daftar Risiko Prioritas Tinggi | List of High-Priority Risks |
-| Hasil | Desired Outcome |
-| Aktivitas prioritas/Keluaran | Priority Activities/Outputs |
-| Sumber daya yang dibutuhkan | Required Resources |
-| Kebutuhan pendampingan teknis | Technical Support Needs |
-| Jadwal | Schedule |
-| (implied) Penanggung Jawab | Responsible Party |
+| Rows | Content | Identification |
+|---|---|---|
+| 1 | Title bar | Red fill `#F7323F` |
+| 3–5 | General info header | Computed read-only |
+| 7–12 | Section heading "9. Rencana Aksi" + column headers | Teal `#7A9090`; col headers row 11 `#D8D8D8` fill |
+| 13–25 | Action plan items (7 items in Para Lando) | Thin borders; alternating `#D8D8D8`/`#F2F2F2` fills; data on odd rows (13,15,17,19,21,23,25); teal spacers on even rows |
+| 27, 29, 31 | Empty placeholder rows | Medium borders; no data |
+| 33 | Validation header "Validasi rencana aksi" | Dark navy `#333F4F`; merged C33:O33 |
+| 35 | Stakeholder party labels | Plain text row |
+| 36 | Signature / representative name cells | Medium borders; empty in Para Lando |
 
-### Example Data (Para Lando — 6 action items visible)
-1. Low education/awareness → Training and materials (TDB equipment, curriculum, draft docs)
-2. Non-permanent housing in flood zone → DRR socialisation, building standards advice
-3. Community disaster understanding → Advocacy to government re: disaster management policy
-4. No alternative livelihoods → Creative economy training, livelihood programmes
-5. Infrastructure gaps → Seawall construction (PTPO), riprap
-6. NRM issues → Training on maximising agricultural/fisheries products
+### Column Headers (row 11)
 
-### Validation Parties (row 35)
-- Community Representative (Perwakilan Masyarakat)
-- BPBD Representative (Disaster Management Agency)
-- Village Representative (Perwakilan Desa)
-- PMI District/City Representative
+| Col | Indonesian | English | db_column_name |
+|---|---|---|---|
+| C | Daftar Risiko Prioritas Tinggi | Priority risk description | `priority_risk_description` |
+| E | Hasil | Desired outcome | `desired_outcome` |
+| G | Aktivitas prioritas/Keluaran | Priority activities / outputs | `priority_activities` |
+| I | Sumber daya yang dibutuhkan (masukan) dan dana | Required resources | `required_resources` |
+| K | Kebutuhan pendampingan teknis | Technical support needs | `technical_support_needs` |
+| M | Jadwal | Schedule | `schedule` |
+| O | Penanggung jawab | Responsible party | `responsible_party` |
 
-### Proposed Tables
+### Example Data (Para Lando — 7 action items)
+
+| Row | Priority Risk (C) | Responsible Party (O) |
+|---|---|---|
+| 13 | Low education levels; awareness still weak | Komandan Sibat dan Pemerintah Desa |
+| 15 | Non-permanent houses in flood-prone areas | Komandan Sibat dan Pemerintah Desa |
+| 17 | Community disaster understanding still low | PMI dan Pemda Terkait |
+| 19 | No alternative livelihoods | (empty) |
+| 21 | Infrastructure lacks emergency response resources | (empty) |
+| 23 | NRM limited; soil type susceptible | (empty) |
+| 25 | Governance structure — village roles unclear | Sibat dan Kepala Desa |
+
+Schedule (col M) not filled in this assessment. Rows 27, 29, 31 are empty placeholder rows for additional items.
+
+### Validation Block (rows 33–36)
+
+Row 33: header "Validasi rencana aksi" (merged C33:O33, dark navy fill).
+Row 35: four party labels — C=Perwakilan Masyarakat, E=Perwakilan BPBD, G=Perwakilan Desa, I=Perwakilan PMI Kabupaten/Kota.
+Row 36: medium-bordered signature/name cells — empty in Para Lando (not yet signed).
+
+### Schema
 
 ```sql
 CREATE TABLE evca_action_items (
-    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id           INTEGER NOT NULL REFERENCES evca_assessments(id),
-    item_order              INTEGER NOT NULL,
-    priority_risk_description TEXT  NOT NULL,   -- the risk being addressed
-    desired_outcome         TEXT,
-    priority_activities     TEXT,               -- may list multiple numbered activities
-    required_resources      TEXT,               -- budget, materials, etc (free-text)
-    technical_support_needs TEXT,               -- facilitators, modules, agencies
-    schedule                TEXT,               -- date or period description
-    responsible_party       TEXT                -- e.g. "Sibat Commander and Village Government"
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id             INTEGER NOT NULL REFERENCES evca_assessments(id),
+    item_order                INTEGER NOT NULL,
+    priority_risk_description TEXT    NOT NULL,
+    desired_outcome           TEXT,
+    priority_activities       TEXT,   -- free text; may list multiple numbered activities
+    required_resources        TEXT,
+    technical_support_needs   TEXT,
+    schedule                  TEXT,
+    responsible_party         TEXT,
+    UNIQUE(assessment_id, item_order)
 );
 
 CREATE TABLE evca_action_validation (
-    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id               INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
-    community_rep_name          TEXT,
-    community_rep_signed        BOOLEAN DEFAULT FALSE,
-    bpbd_rep_name               TEXT,
-    bpbd_rep_signed             BOOLEAN DEFAULT FALSE,
-    village_rep_name            TEXT,
-    village_rep_signed          BOOLEAN DEFAULT FALSE,
-    pmi_rep_name                TEXT,
-    pmi_rep_signed              BOOLEAN DEFAULT FALSE,
-    validation_date             DATE
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id        INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
+    community_rep_name   TEXT,
+    community_rep_signed INTEGER DEFAULT 0,
+    bpbd_rep_name        TEXT,
+    bpbd_rep_signed      INTEGER DEFAULT 0,
+    village_rep_name     TEXT,
+    village_rep_signed   INTEGER DEFAULT 0,
+    pmi_rep_name         TEXT,
+    pmi_rep_signed       INTEGER DEFAULT 0,
+    validation_date      DATE
 );
+```
+
+### Metadata SQL
+
+```sql
+-- Block 35: Action plan items (rows 13–31)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (35, 8, '9. Rencana Aksi', 'Action Plan',
+     'Rencana Aksi', 'Action Plan Items',
+     'evca_action_items', NULL, 'repeating',
+     'thin-bordered data cells; alternating D8D8D8/F2F2F2 fills; teal spacer rows between each item; col headers row 11',
+     'C13', 'O31', 13, 31, 'C', 'O', 0,
+     'Data rows at 13,15,17,19,21,23,25 (step=2); even rows are teal spacers (skip). Rows 27,29,31 are empty medium-bordered placeholders. Import: read odd rows; assign item_order 1..N; stop when C col is empty. Schedule col M not filled in Para Lando.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (35, 'Daftar Risiko Prioritas Tinggi', 'Priority risk description', 'C', 11, 'priority_risk_description', 'TEXT', 0, NULL, 'Col header row 11'),
+    (35, 'Hasil',                          'Desired outcome',           'E', 11, 'desired_outcome',           'TEXT', 0, NULL, NULL),
+    (35, 'Aktivitas prioritas/Keluaran',   'Priority activities',       'G', 11, 'priority_activities',       'TEXT', 0, NULL, NULL),
+    (35, 'Sumber daya yang dibutuhkan',    'Required resources',        'I', 11, 'required_resources',        'TEXT', 0, NULL, NULL),
+    (35, 'Kebutuhan pendampingan teknis',  'Technical support needs',   'K', 11, 'technical_support_needs',   'TEXT', 0, NULL, NULL),
+    (35, 'Jadwal',                         'Schedule',                  'M', 11, 'schedule',                  'TEXT', 0, NULL, 'Not filled in Para Lando'),
+    (35, 'Penanggung jawab',               'Responsible party',         'O', 11, 'responsible_party',         'TEXT', 0, NULL, NULL);
+
+-- Block 36: Stakeholder validation (rows 35–36)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (36, 8, '9. Rencana Aksi', 'Action Plan',
+     'Validasi rencana aksi', 'Action Plan Validation',
+     'evca_action_validation', NULL, 'single',
+     'row 35 = party label row; row 36 = medium-bordered name/signature cells; header C33:O33 merged dark-navy',
+     'C35', 'I36', 35, 36, 'C', 'I', 0,
+     'Row 35 = structural labels (not data). Row 36 = representative names; empty in Para Lando. Import reads C36, E36, G36, I36 for the four rep names.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (36, 'Perwakilan Masyarakat',        'Community representative name', 'C', 36, 'community_rep_name', 'TEXT', 0, NULL, 'Name cell row 36; label at row 35'),
+    (36, 'Perwakilan BPBD',              'BPBD representative name',      'E', 36, 'bpbd_rep_name',      'TEXT', 0, NULL, NULL),
+    (36, 'Perwakilan Desa',              'Village representative name',    'G', 36, 'village_rep_name',   'TEXT', 0, NULL, NULL),
+    (36, 'Perwakilan PMI Kabupaten/Kota','PMI representative name',        'I', 36, 'pmi_rep_name',       'TEXT', 0, NULL, NULL);
 ```
 
 ---

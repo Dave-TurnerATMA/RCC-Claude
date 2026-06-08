@@ -550,3 +550,45 @@ VALUES
     (34, 38, 'Infrastruktur dan layanan',                        'Infrastructure and Services',                   5),
     (34, 39, 'Pengelolaan sumber daya alam',                     'Natural Resource Management',                   6),
     (34, 40, 'Keterhubungan',                                    'Connectedness',                                 7);
+
+
+-- ============================================================
+-- TAB 9  (sheet_index=8)  "9. Rencana Aksi"  —  blocks 35-36
+-- ============================================================
+
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (35, 8, '9. Rencana Aksi', 'Action Plan',
+     'Rencana Aksi', 'Action Plan Items',
+     'evca_action_items', NULL, 'repeating',
+     'thin-bordered data cells; alternating D8D8D8/F2F2F2 fills; teal spacer rows between each item; col headers row 11',
+     'C13', 'O31', 13, 31, 'C', 'O', 0,
+     'Data rows at 13,15,17,19,21,23,25 (step=2); even rows are teal spacers (skip). Rows 27,29,31 are empty medium-bordered placeholders. Import: read odd rows; assign item_order 1..N; stop when C col is empty. Schedule col M not filled in Para Lando.'),
+
+    (36, 8, '9. Rencana Aksi', 'Action Plan',
+     'Validasi rencana aksi', 'Action Plan Validation',
+     'evca_action_validation', NULL, 'single',
+     'row 35 = party label row; row 36 = medium-bordered name/signature cells; header C33:O33 merged dark-navy',
+     'C35', 'I36', 35, 36, 'C', 'I', 0,
+     'Row 35 = structural labels (not data). Row 36 = representative names; empty in Para Lando. Import reads C36, E36, G36, I36 for the four rep names.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (35, 'Daftar Risiko Prioritas Tinggi', 'Priority risk description', 'C', 11, 'priority_risk_description', 'TEXT', 0, NULL, 'Col header row 11'),
+    (35, 'Hasil',                          'Desired outcome',           'E', 11, 'desired_outcome',           'TEXT', 0, NULL, NULL),
+    (35, 'Aktivitas prioritas/Keluaran',   'Priority activities',       'G', 11, 'priority_activities',       'TEXT', 0, NULL, NULL),
+    (35, 'Sumber daya yang dibutuhkan',    'Required resources',        'I', 11, 'required_resources',        'TEXT', 0, NULL, NULL),
+    (35, 'Kebutuhan pendampingan teknis',  'Technical support needs',   'K', 11, 'technical_support_needs',   'TEXT', 0, NULL, NULL),
+    (35, 'Jadwal',                         'Schedule',                  'M', 11, 'schedule',                  'TEXT', 0, NULL, 'Not filled in Para Lando'),
+    (35, 'Penanggung jawab',               'Responsible party',         'O', 11, 'responsible_party',         'TEXT', 0, NULL, NULL),
+    (36, 'Perwakilan Masyarakat',         'Community rep name',         'C', 36, 'community_rep_name',        'TEXT', 0, NULL, 'Name cell row 36; label at row 35'),
+    (36, 'Perwakilan BPBD',               'BPBD rep name',              'E', 36, 'bpbd_rep_name',             'TEXT', 0, NULL, NULL),
+    (36, 'Perwakilan Desa',               'Village rep name',           'G', 36, 'village_rep_name',          'TEXT', 0, NULL, NULL),
+    (36, 'Perwakilan PMI Kabupaten/Kota', 'PMI rep name',               'I', 36, 'pmi_rep_name',              'TEXT', 0, NULL, NULL);
