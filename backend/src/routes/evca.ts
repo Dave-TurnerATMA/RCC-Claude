@@ -528,6 +528,11 @@ router.post('/process/:id', (req: Request, res: Response) => {
   const spreadsheetPath = path.resolve(__dirname, '../../uploads/evca', load.stored_filename);
   const dbPath          = path.resolve(__dirname, '../../community-prep.db');
 
+  console.log(`[EVCA] process load #${load.id}: script=${scriptPath}`);
+  console.log(`[EVCA]   spreadsheet=${spreadsheetPath} exists=${fs.existsSync(spreadsheetPath)}`);
+  console.log(`[EVCA]   db=${dbPath} exists=${fs.existsSync(dbPath)}`);
+  console.log(`[EVCA]   script exists=${fs.existsSync(scriptPath)}`);
+
   if (!fs.existsSync(spreadsheetPath)) {
     return res.status(400).json({ success: false, message: `Spreadsheet file not found on disk: ${load.stored_filename}` });
   }
@@ -537,13 +542,19 @@ router.post('/process/:id', (req: Request, res: Response) => {
     [scriptPath, '--load-id', String(load.id), '--db', dbPath, '--spreadsheet', spreadsheetPath],
     { timeout: 180_000 },
     (error, stdout, stderr) => {
+      if (error) console.error(`[EVCA] execFile error (code ${(error as any).code}): ${error.message}`);
+      if (stderr) console.error(`[EVCA] stderr: ${stderr.slice(0, 500)}`);
       const output = [stdout, stderr ? `STDERR:\n${stderr}` : ''].filter(Boolean).join('\n');
-      // If the script crashed before updating the DB itself, save the output here
-      const mid = db.prepare('SELECT status FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
-      if (mid?.status === 'processing') {
-        const errReport = `Script exited (code ${(error as any)?.code ?? '?'}) before completing:\n\n${output || '(no output)'}`;
-        db.prepare("UPDATE evca_spreadsheet_loads SET status='failure', report=? WHERE id=?")
-          .run(errReport, load.id);
+      try {
+        const mid = db.prepare('SELECT status FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
+        if (mid?.status === 'processing') {
+          const errReport = `Script exited (code ${(error as any)?.code ?? '?'}) before completing:\n\n${output || '(no output)'}`;
+          console.error(`[EVCA] script did not update DB — saving fallback report`);
+          db.prepare("UPDATE evca_spreadsheet_loads SET status='failure', report=? WHERE id=?")
+            .run(errReport, load.id);
+        }
+      } catch (dbErr) {
+        console.error(`[EVCA] DB update in callback failed: ${dbErr}`);
       }
       const final = db.prepare('SELECT status FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
       res.json({
