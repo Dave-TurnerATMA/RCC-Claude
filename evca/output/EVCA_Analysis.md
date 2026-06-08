@@ -606,67 +606,152 @@ VALUES
 ## Sheet 7 — "7. Risiko" (Risk)
 
 ### Description
-Risk calculation per hazard × dimension. Risk is computed from vulnerability and capacity values using the formula: `risk_numeric = f(vulnerability - capacity)`. A hidden lookup table (rows 61–263) maps the VUL−CAP difference (range −1 to +1 in 0.01 steps) to a risk numeric value (0 to 1). The output is a categorical rating: HIGH/MODERATE/LOW (or TINGGI/SEDANG/RENDAH for cross-cutting dimensions).
+Risk ratings per hazard × dimension. Every cell in this sheet is a formula — no manual data entry. Values are computed from Sheets 4–6 using an internal CAP−VUL lookup table (rows 61–263, 203 rows). **No data from this sheet needs to be entered by a user; it is all derived.** The import program reads formula results with `data_only=True`.
 
-The lookup table is an internal calculation tool only — it should **not** be stored in the database. Risk ratings are the stored output.
+- Dims 1–8: `risk_label` is computed from vulnerability (col H) and capacity (col J) via the lookup table
+- Dims 9–11 (cross-cutting): H/J show literal 'N/A' (grayed cells); risk label is copied directly from Tab 6 ratings
 
-### Structure
-- Rows 12–25: Hazard 1 (Tidal Flooding) — 8 standard + 3 cross-cutting dimensions
-- Rows 27–40: Hazard 2 (Coastal Erosion) — same structure
-- Rows 42–55: Hazard 3 (empty) — same structure
+The lookup table is **not stored** — it is a calculation aid only. The formula is approximately linear: `risk_numeric = (vuln − cap + 1) / 2`. Categorical cutoffs: LOW < 0.5, MODERATE 0.5–0.75, HIGH > 0.75.
 
-### Risk Rating Values
-| Label | English |
-|---|---|
-| HIGH / TINGGI | High |
-| MODERATE / SEDANG | Moderate |
-| LOW / RENDAH | Low |
+### Layout
+- **Row 12:** Hazard 1 header (dark red `#C00000`) — "Ancaman 1 — Banjir Rob"
+- **Row 14:** Column headers — Dimensi (C), KERENTANAN (H), KAPASITAS (J), Rating RISIKO (M)
+- **Rows 15–25:** Hazard 1 — dims 1–8 with vuln/cap/risk values; dims 9–11 with N/A vuln/cap and social ratings
+- **Row 27:** Hazard 2 header (red `#F7323F`) — "Ancaman 2 — Abrasi Pantai"
+- **Rows 30–40:** Hazard 2 — same structure
+- **Row 42:** Hazard 3 header (empty/theme fill)
+- **Rows 45–55:** Hazard 3 — dims 1–8 all `#N/A` → NULL; dims 9–11 same social ratings as other hazards
+- **Rows 61–263:** CAP−VUL lookup table — **not stored**
+- **Cols S–X:** Internal risk matrix legend — **not stored**
 
-The numeric conversion (0–1) is also available as a decimal in the lookup table but the categorical label is the primary stored value.
+### Example Data (Para Lando)
 
-### Example Data (Para Lando — Hazard 1: Tidal Flooding)
-| Dimension | Vulnerability | Capacity | Risk |
-|---|---|---|---|
-| Disaster Management | 1.00 | 0.33 | HIGH |
-| Health | 0.67 | 0.67 | MODERATE |
-| Water & Sanitation | 1.00 | 0.67 | HIGH |
-| Housing | 0.67 | 0.67 | MODERATE |
-| Food & Nutrition | 0.67 | 1.00 | MODERATE |
-| Economic Opportunity | 1.00 | 0.67 | HIGH |
-| Infrastructure & Services | 0.67 | 1.00 | MODERATE |
-| Natural Resources | 0.67 | 0.67 | MODERATE |
-| Social Cohesion | N/A | N/A | RENDAH |
-| Inclusion | N/A | N/A | TINGGI |
-| Connectedness | N/A | N/A | SEDANG |
+**Hazard 1 — Banjir Rob (Tidal Flooding):**
+| # | Dimension | Vuln | Cap | Risk Label |
+|---|---|---|---|---|
+| 1 | Manajemen Bencana | 1.00 | 0.33 | HIGH |
+| 2 | Kesehatan | 0.67 | 0.67 | MODERATE |
+| 3 | Air dan Sanitasi | 1.00 | 0.67 | HIGH |
+| 4 | Hunian | 0.67 | 0.67 | MODERATE |
+| 5 | Pangan dan Nutrisi | 0.67 | 1.00 | MODERATE |
+| 6 | Peluang Ekonomi | 1.00 | 0.67 | HIGH |
+| 7 | Infrastruktur dan Layanan | 0.67 | 1.00 | MODERATE |
+| 8 | Pengelolaan SDA | 0.67 | 0.67 | MODERATE |
+| 9 | Kohesi Sosial | N/A | N/A | RENDAH |
+| 10 | Inklusi | N/A | N/A | TINGGI |
+| 11 | Keterhubungan | N/A | N/A | SEDANG |
+
+**Hazard 2 — Abrasi Pantai (Coastal Erosion):**
+| # | Dimension | Vuln | Cap | Risk Label |
+|---|---|---|---|---|
+| 1 | Manajemen Bencana | 1.00 | 0.67 | HIGH |
+| 2 | Kesehatan | 0.00 | 1.00 | LOW |
+| 3 | Air dan Sanitasi | 0.33 | 0.67 | LOW |
+| 4 | Hunian | 0.67 | 0.67 | MODERATE |
+| 5 | Pangan dan Nutrisi | #N/A → NULL | 1.00 | NULL |
+| 6 | Peluang Ekonomi | 0.67 | 0.67 | MODERATE |
+| 7 | Infrastruktur dan Layanan | #N/A → NULL | 0.67 | NULL |
+| 8 | Pengelolaan SDA | 1.00 | 0.67 | HIGH |
+| 9 | Kohesi Sosial | N/A | N/A | RENDAH |
+| 10 | Inklusi | — | — | TINGGI |
+| 11 | Keterhubungan | N/A | N/A | SEDANG |
+
+**Hazard 3:** All dims 1–8 = NULL; dims 9–11 same cross-cutting ratings (shared at assessment level).
 
 ### Proposed Table
 
 ```sql
 CREATE TABLE evca_risk_ratings (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id       INTEGER NOT NULL REFERENCES evca_assessments(id),
-    hazard_id           INTEGER NOT NULL REFERENCES evca_hazards(id),
-    dimension_number    INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 11),
-    vulnerability_value REAL,           -- from evca_vulnerability_ratings (denormalized for convenience)
-    capacity_value      REAL,           -- from evca_capacity_ratings (denormalized for convenience)
-    risk_label          TEXT CHECK(risk_label IN ('HIGH','MODERATE','LOW','TINGGI','SEDANG','RENDAH')),
-    -- Normalised label (computed on insert/update):
-    risk_level          TEXT GENERATED ALWAYS AS (
-                            CASE risk_label
-                                WHEN 'HIGH'     THEN 'high'
-                                WHEN 'TINGGI'   THEN 'high'
-                                WHEN 'MODERATE' THEN 'moderate'
-                                WHEN 'SEDANG'   THEN 'moderate'
-                                WHEN 'LOW'      THEN 'low'
-                                WHEN 'RENDAH'   THEN 'low'
-                                ELSE NULL
-                            END
-                        ) STORED,
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id    INTEGER NOT NULL REFERENCES evca_assessments(id),
+    hazard_id        INTEGER NOT NULL REFERENCES evca_hazards(id),
+    dimension_number INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 11),
+    risk_label       TEXT CHECK(risk_label IN ('HIGH','MODERATE','LOW','TINGGI','SEDANG','RENDAH')),
     UNIQUE(hazard_id, dimension_number)
 );
 ```
 
-> **Note on the lookup table:** The 203-row CAP−VUL → risk numeric conversion table (rows 61–263) is a spreadsheet calculation aid. The conversion formula is linear: `risk_numeric = (vuln - cap + 1) / 2`. No need to store this table; it can be recomputed. The categorical cutoffs are: LOW < 0.5, MODERATE 0.5–0.75, HIGH > 0.75 (approximate based on the data observed).
+> `vulnerability_value` and `capacity_value` are not stored here — they already exist in `evca_vulnerability_ratings` and `evca_capacity_ratings` and can be joined. Denormalising them would risk inconsistency.
+>
+> Dims 9–11 share the same risk label across all hazards (they are assessment-level, not hazard-level). The import program copies the same `evca_social_dimensions.rating_label` value into each hazard's rows 9–11.
+
+### Metadata SQL
+
+```sql
+-- Block 29: Hazard 1 risk ratings (rows 15–25)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (29, 6, '7. Risiko', 'Risk',
+     'Ancaman 1 Risiko', 'Hazard 1 Risk Ratings',
+     'evca_risk_ratings', NULL, 'repeating',
+     'dark-red header fill #C00000, row 12; data rows 15–25, cols C/H/J/M',
+     'C15', 'M25', 15, 25, 'C', 'M',
+     FALSE, 'All cells computed (thin borders); dims 9–11 H/J = N/A text');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (29, 'Dimensi',       'Dimension Number',          'C', 14, 'dimension_number', 'INTEGER', FALSE),
+    (29, 'KERENTANAN',    'Vulnerability Value',        'H', 14, NULL,               'REAL',    TRUE),
+    (29, 'KAPASITAS',     'Capacity Value',             'J', 14, NULL,               'REAL',    TRUE),
+    (29, 'Rating RISIKO', 'Risk Rating Label',          'M', 14, 'risk_label',       'TEXT',    TRUE);
+
+-- Block 30: Hazard 2 risk ratings (rows 30–40)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (30, 6, '7. Risiko', 'Risk',
+     'Ancaman 2 Risiko', 'Hazard 2 Risk Ratings',
+     'evca_risk_ratings', NULL, 'repeating',
+     'red header fill #F7323F, row 27; data rows 30–40, cols C/H/J/M',
+     'C30', 'M40', 30, 40, 'C', 'M',
+     FALSE, 'Dims 5 and 7 have #N/A in vulnerability col → NULL; same table as block 29');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (30, 'Dimensi',       'Dimension Number',          'C', 29, 'dimension_number', 'INTEGER', FALSE),
+    (30, 'KERENTANAN',    'Vulnerability Value',        'H', 29, NULL,               'REAL',    TRUE),
+    (30, 'KAPASITAS',     'Capacity Value',             'J', 29, NULL,               'REAL',    TRUE),
+    (30, 'Rating RISIKO', 'Risk Rating Label',          'M', 29, 'risk_label',       'TEXT',    TRUE);
+
+-- Block 31: Hazard 3 risk ratings (rows 45–55)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (31, 6, '7. Risiko', 'Risk',
+     'Ancaman 3 Risiko', 'Hazard 3 Risk Ratings',
+     'evca_risk_ratings', NULL, 'repeating',
+     'theme fill header, row 42; data rows 45–55, cols C/H/J/M',
+     'C45', 'M55', 45, 55, 'C', 'M',
+     FALSE, 'Dims 1–8 all #N/A → NULL; dims 9–11 same social ratings as other hazards; same table as blocks 29–30');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (31, 'Dimensi',       'Dimension Number',          'C', 44, 'dimension_number', 'INTEGER', FALSE),
+    (31, 'KERENTANAN',    'Vulnerability Value',        'H', 44, NULL,               'REAL',    TRUE),
+    (31, 'KAPASITAS',     'Capacity Value',             'J', 44, NULL,               'REAL',    TRUE),
+    (31, 'Rating RISIKO', 'Risk Rating Label',          'M', 44, 'risk_label',       'TEXT',    TRUE);
+```
+
+> No reference data table for this sheet — the risk labels (HIGH/MODERATE/LOW/TINGGI/SEDANG/RENDAH) are bilingual variants of the same 3 levels. No lookup rows appear at the bottom of this sheet; the only unformatted rows are the CAP−VUL lookup table which is not stored.
 
 ---
 
