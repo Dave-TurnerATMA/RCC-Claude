@@ -1,0 +1,4 @@
+# Ignore spreadsheet files — upload locally per session
+*.xlsx
+*.xls
+*.csv
