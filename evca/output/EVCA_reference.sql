@@ -99,6 +99,21 @@ INSERT INTO evca_ref_social_rating (label_original, label_english, numeric_value
 
 
 -- =============================================================================
+-- Tab 8, Block 34  —  evca_ref_consolidated_dimensions
+-- 7 consolidated dimensions (distinct from the 11 standard EVCA dimensions)
+-- =============================================================================
+
+INSERT INTO evca_ref_consolidated_dimensions (dimension_number, name_id, name_en) VALUES
+    (1, 'Manajemen pengetahuan risiko',                      'Risk Knowledge Management'),
+    (2, 'Kebutuhan dasar (makanan, air & Sanitasi, hunian)', 'Basic Needs (food, water, sanitation, shelter)'),
+    (3, 'Kohesi & Inklusi Sosial',                          'Social Cohesion & Inclusion'),
+    (4, 'Peluang ekonomi',                                  'Economic Opportunity'),
+    (5, 'Infrastruktur dan layanan',                        'Infrastructure and Services'),
+    (6, 'Pengelolaan sumber daya alam',                     'Natural Resource Management'),
+    (7, 'Keterhubungan',                                    'Connectedness');
+
+
+-- =============================================================================
 -- Tab 10  —  evca_priority_criteria
 -- Scoring criteria for the activity priority scoring matrix
 -- =============================================================================

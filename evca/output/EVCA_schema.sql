@@ -76,6 +76,14 @@ CREATE TABLE evca_ref_social_rating (
     numeric_value  REAL    NOT NULL
 );
 
+-- Consolidated dimensions used in Tab 8 analysis (7 dims, distinct from the 11 EVCA dims)
+CREATE TABLE evca_ref_consolidated_dimensions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    dimension_number INTEGER NOT NULL UNIQUE CHECK(dimension_number BETWEEN 1 AND 7),
+    name_id          TEXT    NOT NULL,   -- Indonesian label (as used in drop-down)
+    name_en          TEXT    NOT NULL    -- English translation
+);
+
 -- Scoring criteria for Tab 10 priority matrix
 CREATE TABLE evca_priority_criteria (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

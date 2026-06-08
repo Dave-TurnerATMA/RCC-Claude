@@ -757,57 +757,190 @@ VALUES
 
 ## Sheet 8 — "8. Analisis" (Analysis)
 
-### Description
-Consolidated risk analysis. For each hazard × consolidated dimension, the assessor records:
-- Vulnerability aspects (copied from Sheet 4)
-- Capacity aspects (copied from Sheet 5)
-- Key risk summary narrative
+### Layout
 
-Additionally, a free-text overall risk analysis narrative is captured.
+| Rows | Content | Identification |
+|---|---|---|
+| 1 | Title bar | Red fill `#F7323F` |
+| 4–6 | General info header | Computed read-only; pulls village name and country from Tab 1 |
+| 8–11 | Section heading "2. Konsolidasi Informasi risiko" | Teal `#7A9090`; instruction text dark navy `#333F4F` row 10 |
+| 12–13 | Column headers (double row) | `#333F4F` fill + thin borders; C=Ancaman, G=Dimensi, J=Aspek kerentanan, L=Aspek kapasitas, N=Ringkasan risiko utama |
+| 14–22 | Risk consolidation table (data) | Alternating `#D8D8D8`/`#F2F2F2` fills; thin borders; col C merged C–E per row |
+| 26–30 | Section "2. Analisa Risiko" + overall narrative | Teal header row 26; instruction `#333F4F` row 28; narrative in light-gray medium-bordered cell C30:O30 |
+| 33–40 | Reference data — consolidated dimension list | No fill/border; col G; row 33 = header "Drop-down"; rows 34–40 = 7 values |
 
-This sheet consolidates the 8 standard dimensions into **7 consolidated dimensions** (drop-down list visible in rows 34–40):
+### Data Layout — Risk Consolidation Table
+
+The table runs one row per hazard × consolidated dimension. Col C holds the hazard name, merged across C–E for the first row of each hazard group; subsequent rows in the same group have col C = None (merged-cell inheritance).
+
+```
+Col C   Hazard name (first row of each hazard group only)
+Col G   Consolidated dimension name
+Col J   Vulnerability aspects (text, copied/summarised from Tab 4)
+Col L   Capacity aspects (text, copied/summarised from Tab 5)
+Col N   Key risk summary narrative
+```
+
+**Para Lando — Hazard 1 (Banjir Rob / Tidal Flooding), rows 14–20:**
+
+| Row | Col G (Consolidated Dimension) | Col N (Key Risk Summary, excerpt) |
+|---|---|---|
+| 14 | 1. Manajemen pengetahuan risiko | Tingkat Pendidikan yang masih rendah disertai… |
+| 15 | 2. Kebutuhan dasar (makanan, air & Sanitasi, hunian) | Dari Segi Hunian, Masih adanya Rumah yang Non… |
+| 16 | 3. Kohesi & Inklusi Sosial | Pemahaman masyarakat terkait Bencana yang masih… |
+| 17 | 4. Peluang ekonomi | Tidak memilikinya mata pencaharian alternatif… |
+| 18 | 5. Infrastruktur dan layanan | Insfrastruktur yang dimilik desa cukup memadai… |
+| 19 | 6. Pengelolaan sumber daya alam | Pengelolaan Sumber daya alam yang kurang mak… |
+| 20 | 7. Keterhubungan | Kurangnya minat masyarakat dalam mengelola su… |
+
+**Hazard 2 (Abrasi Pantai), rows 21–22:** Both rows have fill and thin borders but no data entered — assessors left H2 analysis blank. Only 2 placeholder rows are formatted; the full 7-row block was not extended.
+
+**Hazard 3, row 25:** Merged cell C25:E25 exists as a placeholder; no data entered.
+
+### Overall Narrative (row 30)
+
+Single medium-bordered cell merged C30:O30. Para Lando text (excerpt):
+> "Tingkat ancaman Banjir Rob merupakan salah satu ancaman yang Potensi kerugian yang besar…"
+
+### Consolidated Dimensions
+
+This sheet uses **7 consolidated dimensions** (not the 11 EVCA dimensions). They are available as a drop-down reference in col G rows 34–40.
 
 | # | Indonesian | English |
 |---|---|---|
 | 1 | Manajemen pengetahuan risiko | Risk Knowledge Management |
-| 2 | Kebutuhan dasar (makanan, air & hunian) | Basic Needs (food, water & shelter) |
+| 2 | Kebutuhan dasar (makanan, air & Sanitasi, hunian) | Basic Needs (food, water, sanitation, shelter) |
 | 3 | Kohesi & Inklusi Sosial | Social Cohesion & Inclusion |
 | 4 | Peluang ekonomi | Economic Opportunity |
 | 5 | Infrastruktur dan layanan | Infrastructure and Services |
 | 6 | Pengelolaan sumber daya alam | Natural Resource Management |
 | 7 | Keterhubungan | Connectedness |
 
-### Example Data (Para Lando — Hazard 1: Tidal Flooding)
-| Consolidated Dimension | Key Risk Summary (excerpt) |
-|---|---|
-| Risk Knowledge Management | Low education levels; community awareness still weak... |
-| Basic Needs | Housing: still many non-permanent houses in flood-prone areas... |
-| Social Cohesion & Inclusion | Community understanding of disasters still low; regulations needed... |
-| Economic Opportunity | No alternative livelihoods; direct dependence on sea/farm... |
-| Infrastructure & Services | Infrastructure fairly good but lacks emergency response resources... |
-| Natural Resource Management | Natural resource management limited; soil type susceptible... |
-| Connectedness | Community interest in inter-institutional connectivity low... |
+These roughly consolidate the 11 EVCA dimensions: dim 1 → #1; dims 2–5 → #2; dims 6–7 (Tab 6) → #3; dim 8 → #4; dim 9 → #5; dim 10 → #6; dim 11 → #7.
 
-### Proposed Tables
+### Schema
 
 ```sql
+-- New reference table for the 7 consolidated dimensions used in Tab 8
+CREATE TABLE evca_ref_consolidated_dimensions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    dimension_number INTEGER NOT NULL UNIQUE CHECK(dimension_number BETWEEN 1 AND 7),
+    name_id          TEXT    NOT NULL,   -- Indonesian label (as shown in drop-down)
+    name_en          TEXT    NOT NULL    -- English translation
+);
+
+-- Risk analysis: hazard × consolidated dimension narratives
 CREATE TABLE evca_risk_analysis (
-    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id           INTEGER NOT NULL REFERENCES evca_assessments(id),
-    hazard_id               INTEGER NOT NULL REFERENCES evca_hazards(id),
-    -- consolidated dimension number 1-7 per drop-down
-    consolidated_dimension  INTEGER NOT NULL CHECK(consolidated_dimension BETWEEN 1 AND 7),
-    vulnerability_aspects   TEXT,       -- copied/summarised from vulnerability sheet
-    capacity_aspects        TEXT,       -- copied/summarised from capacity sheet
-    key_risk_summary        TEXT,       -- assessor's narrative summary
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id          INTEGER NOT NULL REFERENCES evca_assessments(id),
+    hazard_id              INTEGER NOT NULL REFERENCES evca_hazards(id),
+    consolidated_dimension INTEGER NOT NULL CHECK(consolidated_dimension BETWEEN 1 AND 7),
+    vulnerability_aspects  TEXT,
+    capacity_aspects       TEXT,
+    key_risk_summary       TEXT,
     UNIQUE(hazard_id, consolidated_dimension)
 );
 
+-- Overall risk narrative (one per assessment, row 30)
 CREATE TABLE evca_overall_analysis (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id       INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
-    overall_narrative   TEXT    NOT NULL    -- free-text overall risk analysis
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id     INTEGER NOT NULL REFERENCES evca_assessments(id) UNIQUE,
+    overall_narrative TEXT    NOT NULL
 );
+```
+
+### Reference Data
+
+```sql
+INSERT INTO evca_ref_consolidated_dimensions (dimension_number, name_id, name_en) VALUES
+    (1, 'Manajemen pengetahuan risiko',                       'Risk Knowledge Management'),
+    (2, 'Kebutuhan dasar (makanan, air & Sanitasi, hunian)',  'Basic Needs (food, water, sanitation, shelter)'),
+    (3, 'Kohesi & Inklusi Sosial',                           'Social Cohesion & Inclusion'),
+    (4, 'Peluang ekonomi',                                   'Economic Opportunity'),
+    (5, 'Infrastruktur dan layanan',                         'Infrastructure and Services'),
+    (6, 'Pengelolaan sumber daya alam',                      'Natural Resource Management'),
+    (7, 'Keterhubungan',                                     'Connectedness');
+```
+
+### Metadata SQL
+
+```sql
+-- Block 32: Risk consolidation table (rows 14–22, cols C–N)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (32, 7, '8. Analisis', 'Analysis',
+     'Konsolidasi Informasi Risiko', 'Risk Consolidation Table',
+     'evca_risk_analysis', NULL, 'repeating',
+     'alternating #D8D8D8/#F2F2F2 fills; thin borders; col C merged C-E per row; col headers row 12',
+     'C14', 'N22', 14, 22, 'C', 'N', 0,
+     'Col C=hazard name (first row of each hazard group only; merged-cell None for subsequent rows). H1 rows 14-20 (data present); H2 rows 21-22 (2 placeholder rows, no data entered); H3 row 25 (merge exists, no data). Import: track current hazard_id; step through rows while G has a dimension name.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (32, 'Ancaman',                  'Hazard name',            'C', 12, NULL,                    'TEXT',    0, NULL, 'Col C only; first row of hazard group; look up hazard_id from evca_hazards'),
+    (32, 'Dimensi',                  'Consolidated dimension',  'G', 12, 'consolidated_dimension', 'INTEGER', 0, '[1,2,3,4,5,6,7]', 'Parse number prefix from dim label (e.g. "1. Manajemen…" → 1)'),
+    (32, 'Aspek kerentanan',         'Vulnerability aspects',   'J', 12, 'vulnerability_aspects',  'TEXT',    0, NULL, NULL),
+    (32, 'Aspek kapasitas',          'Capacity aspects',        'L', 12, 'capacity_aspects',       'TEXT',    0, NULL, NULL),
+    (32, 'Ringkasan risiko utama',   'Key risk summary',        'N', 12, 'key_risk_summary',        'TEXT',    0, NULL, NULL);
+
+-- Block 33: Overall risk narrative (row 30, merged C30:O30)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (33, 7, '8. Analisis', 'Analysis',
+     'Analisa Risiko', 'Overall Risk Narrative',
+     'evca_overall_analysis', NULL, 'single',
+     'medium border, light-gray #F2F2F2 fill, single merged cell C30:O30; instruction text #333F4F row 28',
+     'C30', 'O30', 30, 30, 'C', 'O', 0,
+     'Row 28 is instruction text (not data). Single narrative per assessment.');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (33, 'Analisa Risiko', 'Overall risk narrative', 'C', 30, 'overall_narrative', 'TEXT', 0, NULL, 'Merged C30:O30');
+
+-- Block 34: Consolidated dimension reference list (col G rows 34–40)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (34, 7, '8. Analisis', 'Analysis',
+     'Referensi dimensi konsolidasi', 'Ref: Consolidated Dimensions',
+     'evca_ref_consolidated_dimensions', NULL, 'reference',
+     'no fill, no borders; col G; row 33 = "Drop-down" label; rows 34-40 = 7 values',
+     'G34', 'G40', 34, 40, 'G', 'G', 1, NULL);
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (34, 'Dimensi konsolidasi', 'Consolidated dimension name', 'G', 34, 'name_id', 'TEXT', 0, NULL, '7 rows 34-40');
+
+INSERT INTO evca_reference_data
+    (block_id, row_number, value_original, value_english, display_order)
+VALUES
+    (34, 34, 'Manajemen pengetahuan risiko',                      'Risk Knowledge Management',                     1),
+    (34, 35, 'Kebutuhan dasar (makanan, air & Sanitasi, hunian)',  'Basic Needs (food, water, sanitation, shelter)', 2),
+    (34, 36, 'Kohesi & Inklusi Sosial',                           'Social Cohesion & Inclusion',                   3),
+    (34, 37, 'Peluang ekonomi',                                   'Economic Opportunity',                          4),
+    (34, 38, 'Infrastruktur dan layanan',                         'Infrastructure and Services',                   5),
+    (34, 39, 'Pengelolaan sumber daya alam',                      'Natural Resource Management',                   6),
+    (34, 40, 'Keterhubungan',                                     'Connectedness',                                 7);
 ```
 
 ---

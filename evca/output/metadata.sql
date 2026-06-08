@@ -495,3 +495,58 @@ VALUES
     (30, 'Rating RISIKO', 'Risk Rating Label',   'M', 29, 'risk_label',       'TEXT',    1, NULL, NULL),
     (31, 'Dimensi',       'Dimension Number',    'C', 44, 'dimension_number', 'INTEGER', 0, NULL, 'Col header row 44'),
     (31, 'Rating RISIKO', 'Risk Rating Label',   'M', 44, 'risk_label',       'TEXT',    1, NULL, NULL);
+
+
+-- ============================================================
+-- TAB 8  (sheet_index=7)  "8. Analisis"  —  blocks 32-34
+-- ============================================================
+
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english, table_name, target_column,
+     block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (32, 7, '8. Analisis', 'Analysis',
+     'Konsolidasi Informasi Risiko', 'Risk Consolidation Table',
+     'evca_risk_analysis', NULL, 'repeating',
+     'alternating #D8D8D8/#F2F2F2 fills; thin borders; col C merged C-E per row; col headers row 12',
+     'C14', 'N22', 14, 22, 'C', 'N', 0,
+     'Col C=hazard name (first row of each hazard group only; merged-cell None for subsequent rows). H1 rows 14-20 (data present); H2 rows 21-22 (2 placeholder rows, no data entered); H3 row 25 (merge exists, no data). Import: track current hazard_id; step through rows while G has a dimension name.'),
+
+    (33, 7, '8. Analisis', 'Analysis',
+     'Analisa Risiko', 'Overall Risk Narrative',
+     'evca_overall_analysis', NULL, 'single',
+     'medium border, light-gray #F2F2F2 fill, single merged cell C30:O30; instruction text #333F4F row 28',
+     'C30', 'O30', 30, 30, 'C', 'O', 0,
+     'Row 28 is instruction text (not data). Single narrative per assessment.'),
+
+    (34, 7, '8. Analisis', 'Analysis',
+     'Referensi dimensi konsolidasi', 'Ref: Consolidated Dimensions',
+     'evca_ref_consolidated_dimensions', NULL, 'reference',
+     'no fill, no borders; col G; row 33 = "Drop-down" label; rows 34-40 = 7 values',
+     'G34', 'G40', 34, 40, 'G', 'G', 1, NULL);
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed, valid_values, notes)
+VALUES
+    (32, 'Ancaman',                'Hazard name',             'C', 12, NULL,                    'TEXT',    0, NULL, 'First row of each hazard group only; look up hazard_id from evca_hazards'),
+    (32, 'Dimensi',                'Consolidated dimension',  'G', 12, 'consolidated_dimension', 'INTEGER', 0, '[1,2,3,4,5,6,7]', 'Parse number prefix from label e.g. "1. Manajemen…" → 1'),
+    (32, 'Aspek kerentanan',       'Vulnerability aspects',   'J', 12, 'vulnerability_aspects',  'TEXT',    0, NULL, NULL),
+    (32, 'Aspek kapasitas',        'Capacity aspects',        'L', 12, 'capacity_aspects',       'TEXT',    0, NULL, NULL),
+    (32, 'Ringkasan risiko utama', 'Key risk summary',        'N', 12, 'key_risk_summary',       'TEXT',    0, NULL, NULL),
+    (33, 'Analisa Risiko',         'Overall risk narrative',  'C', 30, 'overall_narrative',      'TEXT',    0, NULL, 'Merged C30:O30'),
+    (34, 'Dimensi konsolidasi',    'Consolidated dim name',   'G', 34, 'name_id',                'TEXT',    0, NULL, '7 rows 34-40');
+
+INSERT INTO evca_reference_data
+    (block_id, row_number, value_original, value_english, display_order)
+VALUES
+    (34, 34, 'Manajemen pengetahuan risiko',                     'Risk Knowledge Management',                     1),
+    (34, 35, 'Kebutuhan dasar (makanan, air & Sanitasi, hunian)', 'Basic Needs (food, water, sanitation, shelter)', 2),
+    (34, 36, 'Kohesi & Inklusi Sosial',                          'Social Cohesion & Inclusion',                   3),
+    (34, 37, 'Peluang ekonomi',                                  'Economic Opportunity',                          4),
+    (34, 38, 'Infrastruktur dan layanan',                        'Infrastructure and Services',                   5),
+    (34, 39, 'Pengelolaan sumber daya alam',                     'Natural Resource Management',                   6),
+    (34, 40, 'Keterhubungan',                                    'Connectedness',                                 7);
