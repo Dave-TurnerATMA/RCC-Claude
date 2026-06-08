@@ -246,7 +246,16 @@ CREATE TABLE evca_vulnerability_ratings (
 ## Sheet 5 — "5. Kapasitas" (Capacity)
 
 ### Description
-Capacity assessment per hazard × dimension — mirror structure to Sheet 4. For each of the 3 hazards, the same 11 dimensions are rated for capacity (existing strengths and resources).
+Capacity assessment per hazard × dimension — mirror structure to Sheet 4. For each of the 3 hazards, the same 8 standard dimensions are rated for existing capacity (community strengths and resources available). Dimensions 9–11 (Social Cohesion, Inclusion, Connectedness) are cross-cutting and pulled from Sheet 6 by `#REF!` formula — they are **not** stored here.
+
+An overall capacity narrative (row 14, medium-bordered text box) is stored as a new column on `evca_assessments`.
+
+### Layout
+- **Row 14:** Overall capacity narrative (medium borders, light-gray fill) → `evca_assessments.capacity_overview`
+- **Rows 16–28:** Hazard 1 block (dark red `#C00000` header) — columns C (dimension), G (description), M (rating label), P (rating value)
+- **Rows 30–42:** Hazard 2 block (red `#F7323F` header) — same column layout
+- **Rows 44–56:** Hazard 3 block (empty/unfilled) — same structure, no data
+- **Rows 60–63:** Reference data — rating scale
 
 ### Rating Scale (rows 60–63)
 | Indonesian | English | Numeric |
@@ -256,33 +265,189 @@ Capacity assessment per hazard × dimension — mirror structure to Sheet 4. For
 | Kapasitas RENDAH | LOW | 0.33 |
 | Kapasitas TIDAK ADA | NONE | 0.00 |
 
-### Example Data (Para Lando — Hazard 1: Tidal Flooding)
-| Dimension | Rating | Value |
-|---|---|---|
-| Disaster Management | RENDAH | 0.33 |
-| Health | SEDANG | 0.67 |
-| Water & Sanitation | SEDANG | 0.67 |
-| Housing | SEDANG | 0.67 |
-| Food & Nutrition | TINGGI | 1.00 |
-| Economic Opportunity | SEDANG | 0.67 |
-| Infrastructure & Services | TINGGI | 1.00 |
-| Natural Resources | SEDANG | 0.67 |
+### Example Data (Para Lando)
 
-Capacity notes captured include: village governance (11 committee + 5 BPD members), health posts (1 Pustu, 3 Posyandu, 40 cadres), water sources, schools (SD MIS Al Fitrah, PAUD).
+**Overall capacity narrative (row 14):**
+> "Pada Dasarnya, Kapasitas Desa Leksula sudah lumayan Bagus, ini terbukti dari..." (Basically, the capacity of Leksula Village is already quite good, as evidenced by...)
 
-### Proposed Table
+**Hazard 1 — Banjir Rob (Tidal Flooding):**
+| # | Dimension | Capacity Description (excerpt) | Rating | Value |
+|---|---|---|---|---|
+| 1 | Manajemen Bencana | Pemdes: 11 orang, BPD: 5 orang, Kader: 15 orang, Babink... | Kapasitas RENDAH | 0.33 |
+| 2 | Kesehatan | 1 unit Pustu, 3 Unit Posyandu, 40 Kader PKK, 4 Perawat... | Kapasitas SEDANG | 0.67 |
+| 3 | Air dan Sanitasi | 1 bak penampungan, 2 titik sumber air... | Kapasitas SEDANG | 0.67 |
+| 4 | Hunian | Rumah penduduk sebagian permanen dan sebagian semi permanen... | Kapasitas SEDANG | 0.67 |
+| 5 | Pangan dan Nutrisi | Sumber makanan mudah didapatkan... | Kapasitas TINGGI | 1.00 |
+| 6 | Peluang Ekonomi | Kelompok Tani dan Nelayan, Koperasi Bumdes... | Kapasitas SEDANG | 0.67 |
+| 7 | Infrastruktur dan Layanan | SD MIS Al Fitrah, Paud Suka Maju, SDK Sante... | Kapasitas TINGGI | 1.00 |
+| 8 | Pengelolaan SDA | 2 titik sumber mata air, pengelolaan hutan... | Kapasitas SEDANG | 0.67 |
+| 9 | Social cohesion & Inclusion | #REF! → NULL | — | — |
+| 10 | Connectedness | #REF! → NULL | — | — |
+
+**Hazard 2 — Abrasi Pantai (Coastal Erosion):**
+| # | Dimension | Rating | Value |
+|---|---|---|---|
+| 1 | Manajemen Bencana | Kapasitas SEDANG | 0.67 |
+| 2 | Kesehatan | Kapasitas TINGGI | 1.00 |
+| 3 | Air dan Sanitasi | Kapasitas SEDANG | 0.67 |
+| 4 | Hunian | Kapasitas SEDANG | 0.67 |
+| 5 | Pangan dan Nutrisi | Kapasitas TINGGI | 1.00 |
+| 6 | Peluang Ekonomi | Kapasitas SEDANG | 0.67 |
+| 7 | Infrastruktur dan Layanan | Kapasitas SEDANG | 0.67 |
+| 8 | Pengelolaan SDA | Kapasitas SEDANG | 0.67 |
+| 9–10 | Cross-cutting | #REF! → NULL | — |
+
+**Hazard 3:** No data entered (G column empty, P column shows `#N/A` → NULL).
+
+### Schema Changes
 
 ```sql
+-- New column on evca_assessments (capacity overview narrative)
+ALTER TABLE evca_assessments ADD COLUMN capacity_overview TEXT;
+
+-- New reference table for capacity rating scale
+CREATE TABLE evca_ref_capacity_rating (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    label_original  TEXT NOT NULL UNIQUE,   -- e.g. 'Kapasitas TINGGI'
+    label_english   TEXT NOT NULL,          -- e.g. 'HIGH'
+    numeric_value   REAL NOT NULL
+);
+
+-- Main capacity ratings table
 CREATE TABLE evca_capacity_ratings (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id       INTEGER NOT NULL REFERENCES evca_assessments(id),
-    hazard_id           INTEGER NOT NULL REFERENCES evca_hazards(id),
-    dimension_number    INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 11),
-    capacity_description TEXT,          -- narrative: existing capacity (institutions, resources)
-    rating_label        TEXT CHECK(rating_label IN ('TINGGI','SEDANG','RENDAH','TIDAK ADA')),
-    rating_value        REAL CHECK(rating_value IN (0, 0.33, 0.67, 1)),
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_id        INTEGER NOT NULL REFERENCES evca_assessments(id),
+    hazard_id            INTEGER NOT NULL REFERENCES evca_hazards(id),
+    dimension_number     INTEGER NOT NULL CHECK(dimension_number BETWEEN 1 AND 8),
+    capacity_description TEXT,
+    rating_label         TEXT CHECK(rating_label IN ('Kapasitas TINGGI','Kapasitas SEDANG','Kapasitas RENDAH','Kapasitas TIDAK ADA')),
+    rating_value         REAL CHECK(rating_value IN (0, 0.33, 0.67, 1)),
     UNIQUE(hazard_id, dimension_number)
 );
+```
+
+### Reference Data
+
+```sql
+INSERT INTO evca_ref_capacity_rating (label_original, label_english, numeric_value) VALUES
+    ('Kapasitas TINGGI',    'HIGH',     1.00),
+    ('Kapasitas SEDANG',    'MODERATE', 0.67),
+    ('Kapasitas RENDAH',    'LOW',      0.33),
+    ('Kapasitas TIDAK ADA', 'NONE',     0.00);
+```
+
+### Metadata SQL
+
+```sql
+-- Block 21: Capacity overview narrative (row 14)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (21, 4, '5. Kapasitas', 'Capacity',
+     'Analisis Singkat Keseluruhan Kapasitas', 'Overall Capacity Summary',
+     'evca_assessments', 'capacity_overview', 'single',
+     'medium border all sides, light-gray fill #F2F2F2, row 14',
+     'C14', 'R14', 14, 14, 'C', 'R',
+     FALSE, 'UPDATE evca_assessments; one text box per assessment');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (21, 'Analisis Singkat Keseluruhan Kapasitas', 'Overall Capacity Narrative',
+     'C', 14, 'capacity_overview', 'TEXT', FALSE);
+
+-- Block 22: Hazard 1 capacity ratings (rows 19–28)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (22, 4, '5. Kapasitas', 'Capacity',
+     'Ancaman 1 Kapasitas', 'Hazard 1 Capacity Ratings',
+     'evca_capacity_ratings', NULL, 'repeating',
+     'dark-red header fill #C00000, row 16; data rows 19–28 cols C/G/M/P',
+     'C19', 'P28', 19, 28, 'C', 'P',
+     FALSE, '8 standard dimensions per hazard; dims 9–10 are #REF! → skip');
+
+INSERT INTO evca_block_fields (block_id, field_name_original, field_name_english, column_letter, row_number, db_column_name, db_data_type, is_computed) VALUES
+    (22, 'Dimensi', 'Dimension Number', 'C', 18, 'dimension_number', 'INTEGER', FALSE),
+    (22, 'Kapasitas (masyarakat, rumah tangga, individu)', 'Capacity Description', 'G', 18, 'capacity_description', 'TEXT', FALSE),
+    (22, 'Rating Kapasitas', 'Capacity Rating Label', 'M', 18, 'rating_label', 'TEXT', FALSE),
+    (22, 'Nilai Kapasitas', 'Capacity Rating Value', 'P', 18, 'rating_value', 'REAL', TRUE);
+
+-- Block 23: Hazard 2 capacity ratings (rows 33–42)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (23, 4, '5. Kapasitas', 'Capacity',
+     'Ancaman 2 Kapasitas', 'Hazard 2 Capacity Ratings',
+     'evca_capacity_ratings', NULL, 'repeating',
+     'red header fill #F7323F, row 30; data rows 33–42 cols C/G/M/P',
+     'C33', 'P42', 33, 42, 'C', 'P',
+     FALSE, '8 standard dimensions; same table as block 22, different hazard_id');
+
+INSERT INTO evca_block_fields (block_id, field_name_original, field_name_english, column_letter, row_number, db_column_name, db_data_type, is_computed) VALUES
+    (23, 'Dimensi', 'Dimension Number', 'C', 32, 'dimension_number', 'INTEGER', FALSE),
+    (23, 'Kapasitas (masyarakat, rumah tangga, individu)', 'Capacity Description', 'G', 32, 'capacity_description', 'TEXT', FALSE),
+    (23, 'Rating Kapasitas', 'Capacity Rating Label', 'M', 32, 'rating_label', 'TEXT', FALSE),
+    (23, 'Nilai Kapasitas', 'Capacity Rating Value', 'P', 32, 'rating_value', 'REAL', TRUE);
+
+-- Block 24: Hazard 3 capacity ratings (rows 47–56)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (24, 4, '5. Kapasitas', 'Capacity',
+     'Ancaman 3 Kapasitas', 'Hazard 3 Capacity Ratings',
+     'evca_capacity_ratings', NULL, 'repeating',
+     'theme fill header, row 44; data rows 47–56 cols C/G/M/P',
+     'C47', 'P56', 47, 56, 'C', 'P',
+     FALSE, 'Empty in Para Lando; #N/A values → NULL; same table as blocks 22–23');
+
+INSERT INTO evca_block_fields (block_id, field_name_original, field_name_english, column_letter, row_number, db_column_name, db_data_type, is_computed) VALUES
+    (24, 'Dimensi', 'Dimension Number', 'C', 46, 'dimension_number', 'INTEGER', FALSE),
+    (24, 'Kapasitas (masyarakat, rumah tangga, individu)', 'Capacity Description', 'G', 46, 'capacity_description', 'TEXT', FALSE),
+    (24, 'Rating Kapasitas', 'Capacity Rating Label', 'M', 46, 'rating_label', 'TEXT', FALSE),
+    (24, 'Nilai Kapasitas', 'Capacity Rating Value', 'P', 46, 'rating_value', 'REAL', TRUE);
+
+-- Block 25: Reference data — capacity rating scale (rows 60–63)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (25, 4, '5. Kapasitas', 'Capacity',
+     'Skala Rating Kapasitas', 'Capacity Rating Scale',
+     'evca_ref_capacity_rating', NULL, 'reference',
+     'unformatted rows below main data, rows 60–63',
+     'C60', 'D63', 60, 63, 'C', 'D',
+     TRUE, 'Drop-down validation list; 4 rating levels');
+
+INSERT INTO evca_block_fields (block_id, field_name_original, field_name_english, column_letter, row_number, db_column_name, db_data_type, is_computed) VALUES
+    (25, 'Rating Label', 'Rating Label (original)', 'C', 60, 'label_original', 'TEXT', FALSE),
+    (25, 'Nilai', 'Numeric Value', 'D', 60, 'numeric_value', 'REAL', FALSE);
+
+INSERT INTO evca_reference_data (block_id, row_number, value_original, value_english, numeric_value, display_order) VALUES
+    (25, 60, 'Kapasitas TINGGI',    'HIGH',     1.00, 1),
+    (25, 61, 'Kapasitas SEDANG',    'MODERATE', 0.67, 2),
+    (25, 62, 'Kapasitas RENDAH',    'LOW',      0.33, 3),
+    (25, 63, 'Kapasitas TIDAK ADA', 'NONE',     0.00, 4);
 ```
 
 ---
