@@ -148,8 +148,8 @@ function processLoad(id,btn){
   fetch('/evca/process/'+id,{method:'POST'})
     .then(r=>r.json())
     .then(d=>{
-      alert((d.success?'✓ ':'✗ ')+(d.message||'Done'));
       location.reload();
+      setTimeout(function(){openReport(id);},600);
     })
     .catch(()=>{
       alert('Request failed — check server logs');
@@ -537,13 +537,18 @@ router.post('/process/:id', (req: Request, res: Response) => {
     [scriptPath, '--load-id', String(load.id), '--db', dbPath, '--spreadsheet', spreadsheetPath],
     { timeout: 180_000 },
     (error, stdout, stderr) => {
-      const output = (stdout || '') + (stderr ? `\nSTDERR:\n${stderr}` : '');
-      const success = !error || error.code === 0;
-      const reloaded = db.prepare('SELECT status, report FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
+      const output = [stdout, stderr ? `STDERR:\n${stderr}` : ''].filter(Boolean).join('\n');
+      // If the script crashed before updating the DB itself, save the output here
+      const mid = db.prepare('SELECT status FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
+      if (mid?.status === 'processing') {
+        const errReport = `Script exited (code ${(error as any)?.code ?? '?'}) before completing:\n\n${output || '(no output)'}`;
+        db.prepare("UPDATE evca_spreadsheet_loads SET status='failure', report=? WHERE id=?")
+          .run(errReport, load.id);
+      }
+      const final = db.prepare('SELECT status FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
       res.json({
-        success: reloaded?.status === 'success',
-        message: `Processing ${reloaded?.status === 'success' ? 'completed successfully' : 'failed'} for load #${load.id} (${load.filename}).`,
-        report: output,
+        success: final?.status === 'success',
+        message: `Processing ${final?.status === 'success' ? 'completed successfully' : 'failed'} for load #${load.id} (${load.filename}).`,
       });
     }
   );
