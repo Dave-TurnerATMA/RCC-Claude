@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { execFile } from 'child_process';
 import db from '../db/database';
 
 const router = Router();
@@ -141,12 +142,19 @@ function showTab(n){
 function openReport(id){
   window.open('/evca/loads/'+id+'/report','evca_report_'+id,'width=720,height=560,scrollbars=yes,resizable=yes');
 }
-function processLoad(id){
+function processLoad(id,btn){
   if(!confirm('Run processing for load #'+id+'?')) return;
+  if(btn){btn.disabled=true;btn.textContent='Processing…';btn.style.background='#95a5a6';}
   fetch('/evca/process/'+id,{method:'POST'})
     .then(r=>r.json())
-    .then(d=>{ alert(d.message); })
-    .catch(()=>alert('Request failed'));
+    .then(d=>{
+      alert((d.success?'✓ ':'✗ ')+(d.message||'Done'));
+      location.reload();
+    })
+    .catch(()=>{
+      alert('Request failed — check server logs');
+      if(btn){btn.disabled=false;btn.textContent='Process';btn.style.background='';}
+    });
 }
 `;
 
@@ -165,7 +173,7 @@ function buildManagementPage(flash?: { type: 'ok' | 'err'; msg: string }): strin
     const report = l.report
       ? `<button class="btn-report btn" onclick="openReport(${l.id})">View Report</button>`
       : `<span class="id-label">none</span>`;
-    const process = `<button class="btn-process btn" onclick="processLoad(${l.id})">Process</button>`;
+    const process = `<button class="btn-process btn" onclick="processLoad(${l.id},this)">Process</button>`;
     const view = `<a class="btn-view btn" href="/evca/report?load=${l.id}" target="_blank">View Data</a>`;
     return [
       fmt(l.id),
@@ -512,10 +520,33 @@ router.post('/upload', upload.single('spreadsheet'), (req: Request, res: Respons
 router.post('/process/:id', (req: Request, res: Response) => {
   const load = db.prepare('SELECT * FROM evca_spreadsheet_loads WHERE id=?').get(req.params.id) as any;
   if (!load) return res.status(404).json({ error: 'Load not found' });
+  if (!load.stored_filename) {
+    return res.status(400).json({ success: false, message: `Load #${load.id} has no stored file — cannot process.` });
+  }
 
-  res.json({
-    message: `Processing is not yet implemented. Load #${load.id} (${load.filename}) is queued. The import script will be added in a future step.`,
-  });
+  const scriptPath      = path.resolve(__dirname, '../../../evca/scripts/import_spreadsheet.py');
+  const spreadsheetPath = path.resolve(__dirname, '../../uploads/evca', load.stored_filename);
+  const dbPath          = path.resolve(__dirname, '../../community-prep.db');
+
+  if (!fs.existsSync(spreadsheetPath)) {
+    return res.status(400).json({ success: false, message: `Spreadsheet file not found on disk: ${load.stored_filename}` });
+  }
+
+  execFile(
+    'python3',
+    [scriptPath, '--load-id', String(load.id), '--db', dbPath, '--spreadsheet', spreadsheetPath],
+    { timeout: 180_000 },
+    (error, stdout, stderr) => {
+      const output = (stdout || '') + (stderr ? `\nSTDERR:\n${stderr}` : '');
+      const success = !error || error.code === 0;
+      const reloaded = db.prepare('SELECT status, report FROM evca_spreadsheet_loads WHERE id=?').get(load.id) as any;
+      res.json({
+        success: reloaded?.status === 'success',
+        message: `Processing ${reloaded?.status === 'success' ? 'completed successfully' : 'failed'} for load #${load.id} (${load.filename}).`,
+        report: output,
+      });
+    }
+  );
 });
 
 router.get('/loads/:id/report', (req: Request, res: Response) => {
