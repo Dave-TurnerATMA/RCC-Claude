@@ -455,45 +455,150 @@ INSERT INTO evca_reference_data (block_id, row_number, value_original, value_eng
 ## Sheet 6 — "6. Kohesi, Inklusi, Terhubung" (Social Cohesion, Inclusion, Connectedness)
 
 ### Description
-Three cross-cutting dimensions assessed independently (not per-hazard). These feed by formula into the vulnerability and capacity sheets as dimensions 9–11. Each dimension has a description, a rating label, and a numeric value.
+Three cross-cutting dimensions assessed independently (not per-hazard). These feed by formula reference into Sheets 4 and 5 as dimensions 9–11. This is the authoritative source for those values. The sheet also has a single free-text narrative summarising all three dimensions.
+
+### Layout
+- **Row 12:** Overall narrative (medium borders, light-gray fill) → `evca_assessments.social_dimensions_overview`
+- **Rows 16–18:** Three dimension rows — C (dimension name), G (description), S (rating label), T (rating value)
+- **Rows 22–24:** Reference data — rating scale (3 levels only; no TIDAK ADA)
+
+Note: column layout differs from Sheets 4–5 — rating label is col S (not M) and value is col T (not P).
 
 ### Dimensions
-| Indonesian | English |
-|---|---|
-| Kohesi Sosial | Social Cohesion |
-| Inklusi | Inclusion |
-| Keterhubungan | Connectedness |
+| Row | Indonesian | English | db value |
+|---|---|---|---|
+| 16 | Kohesi Sosial | Social Cohesion | `social_cohesion` |
+| 17 | Inklusi | Inclusion | `inclusion` |
+| 18 | Keterhubungan | Connectedness | `connectedness` |
 
 ### Rating Scale (rows 22–24)
-| Label | Numeric |
-|---|---|
-| TINGGI | 1.00 |
-| SEDANG | 0.67 |
-| RENDAH | 0.33 |
+| Label | English | Numeric |
+|---|---|---|
+| TINGGI | HIGH | 1.00 |
+| SEDANG | MODERATE | 0.67 |
+| RENDAH | LOW | 0.33 |
 
 ### Example Data (Para Lando)
 | Dimension | Description (excerpt) | Rating | Value |
 |---|---|---|---|
-| Social Cohesion | Gotong royong activities in community development... | RENDAH | 0.33 |
-| Inclusion | Needs and creates regulations for... | TINGGI | 1.00 |
-| Connectedness | Village level has no connection to... | SEDANG | 0.67 |
+| Kohesi Sosial | Kegiatan Gotong royong dalam Pembangunan Rumah, Kegiatan stunting... | RENDAH | 0.33 |
+| Inklusi | Membutuhkan dan membuat peraturan tentang bencana yang berkaitan dengan penyelamatan... | TINGGI | 1.00 |
+| Keterhubungan | Tingkat desa belum memiliki koneksi khusus dengan pemerintah, BPBD, DESTANA... | SEDANG | 0.67 |
 
-Note: The sheet also includes a free-text overall narrative (row 12): "Generally, the community already has good..." 
+Overall narrative (row 12): "Secara umum, masyarakat sudah memiliki kohesi sosial tinggi sehingga tingkat res..." (Generally, the community already has high social cohesion so the level of response...)
 
-### Proposed Table
+### Schema Changes
 
 ```sql
+-- New column on evca_assessments (social dimensions overview narrative)
+ALTER TABLE evca_assessments ADD COLUMN social_dimensions_overview TEXT;
+
+-- Reference table for social dimension rating scale
+CREATE TABLE evca_ref_social_rating (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    label_original  TEXT NOT NULL UNIQUE,
+    label_english   TEXT NOT NULL,
+    numeric_value   REAL NOT NULL
+);
+
+-- Social dimensions table (3 rows per assessment)
 CREATE TABLE evca_social_dimensions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     assessment_id   INTEGER NOT NULL REFERENCES evca_assessments(id),
-    -- dimension: social_cohesion, inclusion, connectedness
     dimension       TEXT    NOT NULL CHECK(dimension IN ('social_cohesion','inclusion','connectedness')),
-    description     TEXT,       -- narrative description
-    rating_label    TEXT        CHECK(rating_label IN ('TINGGI','SEDANG','RENDAH')),
-    rating_value    REAL        CHECK(rating_value IN (0.33, 0.67, 1)),
-    overall_narrative TEXT,     -- shared narrative (store once, e.g. only on first row or separate field)
+    description     TEXT,
+    rating_label    TEXT    CHECK(rating_label IN ('TINGGI','SEDANG','RENDAH')),
+    rating_value    REAL    CHECK(rating_value IN (0.33, 0.67, 1)),
     UNIQUE(assessment_id, dimension)
 );
+```
+
+### Reference Data
+
+```sql
+INSERT INTO evca_ref_social_rating (label_original, label_english, numeric_value) VALUES
+    ('TINGGI', 'HIGH',     1.00),
+    ('SEDANG', 'MODERATE', 0.67),
+    ('RENDAH', 'LOW',      0.33);
+```
+
+### Metadata SQL
+
+```sql
+-- Block 26: Overall social dimensions narrative (row 12)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (26, 5, '6. Kohesi, Inklusi, Terhubung', 'Social Cohesion, Inclusion, Connectedness',
+     'Analisis Keseluruhan Dimensi Ketahanan', 'Overall Resilience Dimensions Narrative',
+     'evca_assessments', 'social_dimensions_overview', 'single',
+     'medium border all sides, light-gray fill #F2F2F2, row 12',
+     'C12', 'R12', 12, 12, 'C', 'R',
+     FALSE, 'UPDATE evca_assessments; one text box per assessment');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (26, 'Analisis Keseluruhan Dimensi Ketahanan', 'Overall Resilience Dimensions Narrative',
+     'C', 12, 'social_dimensions_overview', 'TEXT', FALSE);
+
+-- Block 27: Social dimension ratings (rows 16–18)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (27, 5, '6. Kohesi, Inklusi, Terhubung', 'Social Cohesion, Inclusion, Connectedness',
+     'Peringkat Kohesi Sosial, Inklusi & Keterhubungan', 'Social Cohesion, Inclusion & Connectedness Ratings',
+     'evca_social_dimensions', NULL, 'repeating',
+     'thin-border dimension labels col C; medium-border description col G; rating col S; value col T; rows 16–18',
+     'C16', 'T18', 16, 18, 'C', 'T',
+     FALSE, '3 rows, one per dimension; col layout differs from Tabs 4–5 (S=rating, T=value)');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (27, 'Dimensi', 'Dimension',                   'C', 16, 'dimension',    'TEXT', FALSE),
+    (27, 'Deskripsi', 'Description',               'G', 16, 'description',  'TEXT', FALSE),
+    (27, 'Peringkat', 'Rating Label',               'S', 16, 'rating_label', 'TEXT', FALSE),
+    (27, 'Nilai',     'Rating Value',               'T', 16, 'rating_value', 'REAL', TRUE);
+
+-- Block 28: Reference data — social rating scale (rows 22–24)
+INSERT INTO evca_sheet_blocks
+    (id, sheet_index, sheet_name_original, sheet_name_english,
+     block_name_original, block_name_english,
+     table_name, target_column, block_type, identification_method,
+     cell_range_start, cell_range_end, row_start, row_end, col_start, col_end,
+     is_reference_data, notes)
+VALUES
+    (28, 5, '6. Kohesi, Inklusi, Terhubung', 'Social Cohesion, Inclusion, Connectedness',
+     'Skala Rating Sosial', 'Social Dimension Rating Scale',
+     'evca_ref_social_rating', NULL, 'reference',
+     'unformatted rows below main data, rows 22–24',
+     'C22', 'D24', 22, 24, 'C', 'D',
+     TRUE, '3 rating levels only (no TIDAK ADA); used as drop-down validation');
+
+INSERT INTO evca_block_fields
+    (block_id, field_name_original, field_name_english,
+     column_letter, row_number, db_column_name, db_data_type, is_computed)
+VALUES
+    (28, 'Rating Label', 'Rating Label (original)', 'C', 22, 'label_original', 'TEXT', FALSE),
+    (28, 'Nilai',        'Numeric Value',           'D', 22, 'numeric_value',  'REAL', FALSE);
+
+INSERT INTO evca_reference_data
+    (block_id, row_number, value_original, value_english, numeric_value, display_order)
+VALUES
+    (28, 22, 'TINGGI', 'HIGH',     1.00, 1),
+    (28, 23, 'SEDANG', 'MODERATE', 0.67, 2),
+    (28, 24, 'RENDAH', 'LOW',      0.33, 3);
 ```
 
 ---
