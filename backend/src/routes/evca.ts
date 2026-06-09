@@ -255,17 +255,58 @@ ${load.report
 // ── data report (10 tabs) ─────────────────────────────────────────────────────
 
 function buildTab1(): string[] {
-  const assessments = db.prepare('SELECT a.*, s.filename as load_filename FROM evca_assessments a LEFT JOIN evca_spreadsheet_loads s ON s.id=a.load_id ORDER BY a.id').all() as any[];
-  const dimensions  = db.prepare('SELECT * FROM evca_dimensions ORDER BY display_order').all() as any[];
+  const assessments = db.prepare(
+    'SELECT a.*, s.filename as load_filename FROM evca_assessments a LEFT JOIN evca_spreadsheet_loads s ON s.id=a.load_id ORDER BY a.id'
+  ).all() as any[];
+  const dimensions = db.prepare('SELECT * FROM evca_dimensions ORDER BY display_order').all() as any[];
+  const riskRows   = db.prepare(
+    'SELECT rs.dimension_number, rs.risk_label, h.hazard_number, h.hazard_name, a.id as aid, a.village_name ' +
+    'FROM evca_risk_summary rs ' +
+    'JOIN evca_hazards h ON h.id=rs.hazard_id ' +
+    'JOIN evca_assessments a ON a.id=rs.assessment_id ' +
+    'ORDER BY a.id, rs.dimension_number, h.hazard_number'
+  ).all() as any[];
 
   const asmRows = assessments.map(a => [
     fmt(a.id), fmt(a.load_filename || a.load_id), fmt(a.village_name),
     fmt(a.district), fmt(a.province), fmt(a.country), fmt(a.start_date), fmt(a.responsible_person),
   ]);
 
+  // Risk summary matrix: dimensions (rows) × hazards (columns)
+  const riskCards: string[] = [];
+  const byAssessment = new Map<number, any[]>();
+  for (const r of riskRows) {
+    if (!byAssessment.has(r.aid)) byAssessment.set(r.aid, []);
+    byAssessment.get(r.aid)!.push(r);
+  }
+  for (const [, rows] of byAssessment) {
+    const village = rows[0].village_name;
+    const hazardNums = [...new Set<number>(rows.map((r: any) => r.hazard_number))].sort((a, b) => a - b);
+    const hazardLabels = hazardNums.map(n => {
+      const h = rows.find((r: any) => r.hazard_number === n);
+      return `H${n}: ${h?.hazard_name ?? ''}`;
+    });
+    const lookup = new Map<string, string>();
+    for (const r of rows) lookup.set(`${r.dimension_number}-${r.hazard_number}`, r.risk_label);
+    const tableRows = dimensions.map(d => [
+      esc(d.name_en),
+      ...hazardNums.map(n => badge(lookup.get(`${d.display_order}-${n}`))),
+    ]);
+    riskCards.push(card(`Risk Pattern Summary — ${village}`, 'evca_risk_summary',
+      dtable(['Dimension', ...hazardLabels], tableRows)));
+  }
+
+  // Assessment narrative cards
+  const narrativeCards = assessments
+    .filter(a => a.assessment_selection_narrative)
+    .map(a => card(`Assessment Selection Narrative — ${a.village_name}`, 'assessment_selection_narrative',
+      `<p style="line-height:1.7">${fmt(a.assessment_selection_narrative)}</p>`));
+
   return [
     card('Assessments', 'evca_assessments',
       dtable(['ID', 'Source Load', 'Village', 'District', 'Province', 'Country', 'Start Date', 'Responsible Person'], asmRows)),
+    ...narrativeCards,
+    ...riskCards,
     card('EVCA Dimensions (reference)', 'evca_dimensions', refList(dimensions)),
   ];
 }
@@ -281,10 +322,21 @@ function buildTab2(): string[] {
   const geoEnvs    = db.prepare('SELECT * FROM evca_ref_geophysical_env ORDER BY env_type, id').all() as any[];
   const livelihoods = db.prepare('SELECT * FROM evca_ref_livelihood ORDER BY id').all() as any[];
 
+  const textCards: string[] = [];
+  for (const c of contexts) {
+    if (c.community_description)
+      textCards.push(card(`Community Description — ${c.village_name}`, 'community_description',
+        `<p style="line-height:1.7">${fmt(c.community_description)}</p>`));
+    if (c.assessment_process)
+      textCards.push(card(`Assessment Process — ${c.village_name}`, 'assessment_process',
+        `<p style="line-height:1.7">${fmt(c.assessment_process)}</p>`));
+  }
+
   return [
+    ...textCards,
     card('Community Context', 'evca_community_context',
-      dtable(['Village', 'Community Type', 'Geo (location)', 'Geo (terrain)', 'Primary Livelihood', 'Secondary Livelihood'],
-        contexts.map(c => [fmt(c.village_name), fmt(c.community_type), fmt(c.geophysical_env_1), fmt(c.geophysical_env_2), fmt(c.livelihood_primary), fmt(c.livelihood_secondary)]))),
+      dtable(['Village', 'Type', 'Geo (location)', 'Geo (terrain)', 'Primary Livelihood', 'Secondary Livelihood', 'Participants M', 'Participants F'],
+        contexts.map(c => [fmt(c.village_name), fmt(c.community_type), fmt(c.geophysical_env_1), fmt(c.geophysical_env_2), fmt(c.livelihood_primary), fmt(c.livelihood_secondary), fmt(c.evca_participants_male), fmt(c.evca_participants_female)]))),
     card('Population', 'evca_population',
       dtable(['Village', 'Age Group', 'Male', 'Female', 'Disability M', 'Disability F'],
         popRows.map(p => [fmt(p.village_name), fmt(p.age_group.replace(/_/g, '–')), fmt(p.male_count), fmt(p.female_count), fmt(p.disability_male), fmt(p.disability_female)]))),
@@ -299,7 +351,18 @@ function buildTab3(): string[] {
   const hazards = db.prepare(
     'SELECT h.*, a.village_name FROM evca_hazards h JOIN evca_assessments a ON a.id=h.assessment_id ORDER BY a.id, h.hazard_number'
   ).all() as any[];
+  const rationales = db.prepare(
+    'SELECT village_name, hazard_selection_rationale, priority_hazard_count FROM evca_assessments WHERE hazard_selection_rationale IS NOT NULL'
+  ).all() as any[];
+
+  const rationaleCards = rationales.map(a =>
+    card(`Hazard Selection Rationale — ${a.village_name}`, 'hazard_selection_rationale',
+      `<p style="line-height:1.7">${fmt(a.hazard_selection_rationale)}</p>` +
+      (a.priority_hazard_count != null ? `<p style="margin-top:8px"><strong>Priority hazard count:</strong> ${esc(String(a.priority_hazard_count))}</p>` : ''))
+  );
+
   return [
+    ...rationaleCards,
     card('Hazards', 'evca_hazards',
       dtable(['Village', '#', 'Name', 'Cause/Origin', 'Warning Signs', 'Action Time', 'Frequency', 'Period', 'Duration'],
         hazards.map(h => [fmt(h.village_name), fmt(h.hazard_number), fmt(h.hazard_name), fmt(h.cause_origin), fmt(h.warning_signs), fmt(h.action_time), fmt(h.frequency), fmt(h.occurrence_period), fmt(h.duration)]))),
@@ -320,7 +383,15 @@ function buildTab4(): string[] {
   ).all() as any[];
   const vulnScale = db.prepare('SELECT * FROM evca_ref_vulnerability_rating ORDER BY numeric_value DESC').all() as any[];
 
+  const overviewCards4 = db.prepare(
+    'SELECT village_name, vulnerability_overview FROM evca_assessments WHERE vulnerability_overview IS NOT NULL'
+  ).all().map((a: any) =>
+    card(`Vulnerability Overview — ${a.village_name}`, 'vulnerability_overview',
+      `<p style="line-height:1.7">${fmt(a.vulnerability_overview)}</p>`)
+  );
+
   return [
+    ...overviewCards4,
     card('Vulnerable Groups', 'evca_vulnerable_groups',
       dtable(['Village', '#', 'Group Name', 'Vulnerability Reasons'],
         groups.map(g => [fmt(g.village_name), fmt(g.group_number), fmt(g.group_name), fmt(g.vulnerability_reasons)]))),
@@ -344,7 +415,15 @@ function buildTab5(): string[] {
   ).all() as any[];
   const capScale = db.prepare('SELECT * FROM evca_ref_capacity_rating ORDER BY numeric_value DESC').all() as any[];
 
+  const overviewCards5 = db.prepare(
+    'SELECT village_name, capacity_overview FROM evca_assessments WHERE capacity_overview IS NOT NULL'
+  ).all().map((a: any) =>
+    card(`Capacity Overview — ${a.village_name}`, 'capacity_overview',
+      `<p style="line-height:1.7">${fmt(a.capacity_overview)}</p>`)
+  );
+
   return [
+    ...overviewCards5,
     card('Capacity Ratings', 'evca_capacity_ratings',
       dtable(['Village', 'Hazard', 'Dimension', 'Capacity Description', 'Rating', 'Value'],
         ratings.map(r => [fmt(r.village_name), fmt(`H${r.hazard_number}: ${r.hazard_name}`), fmt(r.dim_name || `Dim ${r.dimension_number}`), fmt(r.capacity_description), badge(r.rating_label), fmt(r.rating_value)]))),
@@ -360,7 +439,15 @@ function buildTab6(): string[] {
   ).all() as any[];
   const socialScale = db.prepare('SELECT * FROM evca_ref_social_rating ORDER BY numeric_value DESC').all() as any[];
 
+  const overviewCards6 = db.prepare(
+    'SELECT village_name, social_dimensions_overview FROM evca_assessments WHERE social_dimensions_overview IS NOT NULL'
+  ).all().map((a: any) =>
+    card(`Social Dimensions Overview — ${a.village_name}`, 'social_dimensions_overview',
+      `<p style="line-height:1.7">${fmt(a.social_dimensions_overview)}</p>`)
+  );
+
   return [
+    ...overviewCards6,
     card('Social Cohesion, Inclusion & Connectedness', 'evca_social_dimensions',
       dtable(['Village', 'Dimension', 'Description', 'Rating', 'Value'],
         social.map(s => [fmt(s.village_name), fmt(s.dimension.replace(/_/g, ' ')), fmt(s.description), badge(s.rating_label), fmt(s.rating_value)]))),
