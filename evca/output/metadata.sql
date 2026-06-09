@@ -6,8 +6,19 @@
 -- SCHEMA
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS evca_layout_versions (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT    NOT NULL,
+    description TEXT,
+    is_default  INTEGER DEFAULT 0
+);
+
+INSERT OR IGNORE INTO evca_layout_versions (id, name, description, is_default)
+VALUES (1, 'v1.0 (Standard)', 'Standard EVCA layout as used in Para Lando 2024', 1);
+
 CREATE TABLE IF NOT EXISTS evca_sheet_blocks (
     id                    INTEGER PRIMARY KEY,
+    layout_version_id     INTEGER NOT NULL DEFAULT 1 REFERENCES evca_layout_versions(id),
     sheet_index           INTEGER NOT NULL,
     sheet_name_original   TEXT    NOT NULL,
     sheet_name_english    TEXT    NOT NULL,

@@ -184,11 +184,14 @@ def _validate_block(block, ws, meta_conn):
     return 'WARN!', details
 
 
-def run_validation(wb, meta_conn, report):
+def run_validation(wb, meta_conn, report, layout_version_id=1):
     """Returns True if safe to proceed with import."""
     report.section('Phase 1: Structural Validation')
     sheets = wb.worksheets
-    blocks = meta_conn.execute('SELECT * FROM evca_sheet_blocks ORDER BY id').fetchall()
+    blocks = meta_conn.execute(
+        'SELECT * FROM evca_sheet_blocks WHERE layout_version_id=? ORDER BY id',
+        (layout_version_id,)
+    ).fetchall()
     counts = {'PASS': 0, 'WARN!': 0, 'EMPTY': 0}
     critical_warn = False
     cur_sheet = None
@@ -715,15 +718,17 @@ def import_tab10(ws, db_conn, load_id, assessment_id, report):
 
 def main():
     parser = argparse.ArgumentParser(description='Import EVCA spreadsheet into SQLite DB')
-    parser.add_argument('--load-id',     required=True, type=int)
-    parser.add_argument('--db',          required=True)
-    parser.add_argument('--spreadsheet', required=True)
+    parser.add_argument('--load-id',           required=True, type=int)
+    parser.add_argument('--db',                required=True)
+    parser.add_argument('--spreadsheet',       required=True)
+    parser.add_argument('--layout-version-id', type=int, default=1)
     args = parser.parse_args()
 
     report = Report()
     report.info(f'Started: {datetime.now().isoformat()}')
     report.info(f'Spreadsheet: {os.path.basename(args.spreadsheet)}')
     report.info(f'Load ID: {args.load_id}')
+    report.info(f'Layout version ID: {args.layout_version_id}')
 
     for label, path in [('Metadata', METADATA_SQL), ('Spreadsheet', args.spreadsheet), ('Database', args.db)]:
         if not os.path.exists(path):
@@ -744,7 +749,7 @@ def main():
     wb = load_workbook(args.spreadsheet, data_only=True)
 
     try:
-        if not run_validation(wb, meta_conn, report):
+        if not run_validation(wb, meta_conn, report, args.layout_version_id):
             db_conn.execute(
                 "UPDATE evca_spreadsheet_loads SET status='failure', report=? WHERE id=?",
                 (report.text(), args.load_id)

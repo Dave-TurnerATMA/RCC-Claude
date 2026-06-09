@@ -1,16 +1,41 @@
 import db from './database';
 
 export function initializeEvcaDatabase(): void {
-  // evca_spreadsheet_loads must be created first — data tables FK to it
+  // Layout versions (referenced by uploads/runs)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evca_layout_versions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL UNIQUE,
+        description TEXT,
+        is_default  INTEGER DEFAULT 0
+    );
+  `);
+  db.prepare(
+    `INSERT OR IGNORE INTO evca_layout_versions (id, name, description, is_default) VALUES (?,?,?,?)`
+  ).run(1, 'v1.0 (Standard)', 'Standard EVCA layout (2024)', 1);
+
+  // evca_uploads — one row per file upload
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evca_uploads (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename        TEXT    NOT NULL,
+        stored_filename TEXT    NOT NULL,
+        uploaded_at     DATETIME DEFAULT (datetime('now'))
+    );
+  `);
+
+  // evca_spreadsheet_loads — one row per process run (FK to upload + layout version)
   db.exec(`
     CREATE TABLE IF NOT EXISTS evca_spreadsheet_loads (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        filename         TEXT    NOT NULL,
-        stored_filename  TEXT,
-        uploaded_at      DATETIME DEFAULT (datetime('now')),
-        status           TEXT    NOT NULL DEFAULT 'pending'
-                             CHECK(status IN ('pending','processing','success','failure')),
-        report           TEXT
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        upload_id         INTEGER REFERENCES evca_uploads(id),
+        layout_version_id INTEGER DEFAULT 1 REFERENCES evca_layout_versions(id),
+        filename          TEXT    NOT NULL,
+        stored_filename   TEXT,
+        uploaded_at       DATETIME DEFAULT (datetime('now')),
+        status            TEXT    NOT NULL DEFAULT 'pending'
+                              CHECK(status IN ('pending','processing','success','failure')),
+        report            TEXT
     );
   `);
 
@@ -282,7 +307,7 @@ export function initializeEvcaDatabase(): void {
     );
   `);
 
-  // Migrations — add load_id to tables that existed before this column was introduced
+  // Migrations — add load_id to data tables that existed before this column was introduced
   const dataTables = [
     'evca_assessments', 'evca_community_context', 'evca_population',
     'evca_hazards', 'evca_vulnerable_groups', 'evca_vulnerability_ratings',
@@ -291,13 +316,29 @@ export function initializeEvcaDatabase(): void {
     'evca_action_items', 'evca_action_validation', 'evca_priority_scores_flat',
   ];
   for (const t of dataTables) {
-    try {
-      db.exec(`ALTER TABLE ${t} ADD COLUMN load_id INTEGER REFERENCES evca_spreadsheet_loads(id)`);
-    } catch { /* column already exists */ }
+    try { db.exec(`ALTER TABLE ${t} ADD COLUMN load_id INTEGER REFERENCES evca_spreadsheet_loads(id)`); }
+    catch { /* already exists */ }
+  }
+
+  // Migrations — add upload_id and layout_version_id to evca_spreadsheet_loads
+  try { db.exec(`ALTER TABLE evca_spreadsheet_loads ADD COLUMN upload_id INTEGER REFERENCES evca_uploads(id)`); }
+  catch { /* already exists */ }
+  try { db.exec(`ALTER TABLE evca_spreadsheet_loads ADD COLUMN layout_version_id INTEGER DEFAULT 1 REFERENCES evca_layout_versions(id)`); }
+  catch { /* already exists */ }
+
+  // Migrate existing evca_spreadsheet_loads rows that have a stored file but no upload_id yet
+  const orphanLoads = db.prepare(
+    `SELECT id, filename, stored_filename, uploaded_at FROM evca_spreadsheet_loads
+     WHERE stored_filename IS NOT NULL AND upload_id IS NULL`
+  ).all() as any[];
+  for (const load of orphanLoads) {
+    const uploadId = (db.prepare(
+      `INSERT INTO evca_uploads (filename, stored_filename, uploaded_at) VALUES (?,?,?)`
+    ).run(load.filename, load.stored_filename, load.uploaded_at) as any).lastInsertRowid;
+    db.prepare(`UPDATE evca_spreadsheet_loads SET upload_id=? WHERE id=?`).run(uploadId, load.id);
   }
 
   seedReferenceData();
-  seedTestData();
 }
 
 function seedReferenceData(): void {
@@ -377,17 +418,3 @@ function seedReferenceData(): void {
   `);
 }
 
-function seedTestData(): void {
-  const already = (db.prepare('SELECT COUNT(*) as n FROM evca_spreadsheet_loads').get() as any).n;
-  if (already > 0) return;
-
-  db.prepare(
-    `INSERT INTO evca_spreadsheet_loads (filename, stored_filename, status, report)
-     VALUES (?, ?, ?, ?)`
-  ).run(
-    'EVCA_Desa_Para_Lando.xlsx',
-    null,
-    'pending',
-    'Test record — no file stored. Use the upload form to load a real spreadsheet.'
-  );
-}
