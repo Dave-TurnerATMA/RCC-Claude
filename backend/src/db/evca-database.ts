@@ -321,10 +321,17 @@ export function initializeEvcaDatabase(): void {
   }
 
   // Migrations — add upload_id and layout_version_id to evca_spreadsheet_loads
-  try { db.exec(`ALTER TABLE evca_spreadsheet_loads ADD COLUMN upload_id INTEGER REFERENCES evca_uploads(id)`); }
-  catch { /* already exists */ }
-  try { db.exec(`ALTER TABLE evca_spreadsheet_loads ADD COLUMN layout_version_id INTEGER DEFAULT 1 REFERENCES evca_layout_versions(id)`); }
-  catch { /* already exists */ }
+  for (const sql of [
+    `ALTER TABLE evca_spreadsheet_loads ADD COLUMN upload_id INTEGER REFERENCES evca_uploads(id)`,
+    `ALTER TABLE evca_spreadsheet_loads ADD COLUMN layout_version_id INTEGER DEFAULT 1`,
+  ]) {
+    try { db.exec(sql); }
+    catch (e: any) {
+      if (!String(e?.message).includes('duplicate column name')) {
+        console.error(`[EVCA] migration warning: ${e?.message}`);
+      }
+    }
+  }
 
   // Migrate existing evca_spreadsheet_loads rows that have a stored file but no upload_id yet
   const orphanLoads = db.prepare(
