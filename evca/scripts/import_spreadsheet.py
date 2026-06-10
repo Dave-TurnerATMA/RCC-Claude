@@ -398,8 +398,10 @@ def import_tab1_risk_summary(ws0, db_conn, load_id, assessment_id, hazard_ids, r
         if not hazard_id:
             report.info(f'Tab 1 risk summary: Hazard {hnum} not in DB — skipping')
             continue
+        row_values = []
         for dim_offset, row in enumerate(range(row_start, row_end + 1)):
             risk_label = cv(ws0, 'E', row)
+            row_values.append(f'E{row}={risk_label!r}')
             if risk_label is None:
                 continue
             try:
@@ -412,6 +414,7 @@ def import_tab1_risk_summary(ws0, db_conn, load_id, assessment_id, hazard_ids, r
                 count += 1
             except Exception as e:
                 report.error(f'Tab 1 risk summary H{hnum} dim {dim_offset+1}: {e}')
+        report.info(f'Tab 1 risk summary H{hnum} (rows {row_start}-{row_end}): {", ".join(row_values)}')
     db_conn.commit()
     report.info(f'Tab 1: {count} risk_summary rows inserted')
 
