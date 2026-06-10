@@ -444,7 +444,7 @@ export function SubTaskForm({ task, users, equipment, mainTasks, defaultMainTask
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Scheduled Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Scheduled Date <span className="text-gray-400 font-normal">(optional)</span></label>
             <input type="date" value={form.scheduled_date} onChange={e => set('scheduled_date', e.target.value)}
               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
