@@ -4,6 +4,8 @@ import cors from 'cors';
 import path from 'path';
 import { initializeDatabase } from './db/database';
 import { seedDatabase } from './db/seed';
+import { initializeEvcaDatabase } from './db/evca-database';
+import evcaRouter from './routes/evca';
 import teamsRouter from './routes/teams';
 import usersRouter from './routes/users';
 import requiredTasksRouter from './routes/required-tasks';
@@ -29,6 +31,7 @@ if (require('fs').existsSync(FRONTEND_DIST)) {
 
 initializeDatabase();
 seedDatabase();
+initializeEvcaDatabase();
 
 app.use('/api/teams', teamsRouter);
 app.use('/api/teams', usersRouter);
@@ -39,6 +42,7 @@ app.use('/api/teams', notificationsRouter);
 app.use('/api/teams', dashboardRouter);
 app.use('/api', uploadsRouter);
 app.use('/api', spreadsheetRouter);
+app.use('/evca', evcaRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
