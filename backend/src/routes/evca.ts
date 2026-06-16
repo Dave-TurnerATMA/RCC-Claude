@@ -789,7 +789,7 @@ router.post('/uploads/:id/process', (req: Request, res: Response) => {
 
   const scriptPath      = path.resolve(__dirname, '../../../evca/scripts/import_spreadsheet.py');
   const spreadsheetPath = path.resolve(__dirname, '../../uploads/evca', up.stored_filename);
-  const dbPath          = path.resolve(__dirname, '../../community-prep.db');
+  const dbPath          = path.resolve(__dirname, '../../data/community_prep.db');
 
   console.log(`[EVCA] upload #${up.id} → new run #${runId}: layout_version=${layoutVersionId}`);
   console.log(`[EVCA]   spreadsheet=${spreadsheetPath} exists=${fs.existsSync(spreadsheetPath)}`);
