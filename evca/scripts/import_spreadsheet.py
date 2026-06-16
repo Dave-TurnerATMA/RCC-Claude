@@ -121,8 +121,8 @@ def safe_sheet(sheets, idx, label, report):
     """Return sheets[idx], or None and a report.error if the index is out of range."""
     if idx < 0 or idx >= len(sheets):
         report.error(
-            f'{label}: expected sheet at index {idx} but workbook only has {len(sheets)} '
-            f'sheet(s) (valid indices 0-{len(sheets) - 1}). Skipping this tab.'
+            f'{label}: expected sheet {idx + 1} but workbook only has {len(sheets)} '
+            f'sheet(s) (valid sheet numbers 1-{len(sheets)}). Skipping this tab.'
         )
         return None
     return sheets[idx]
@@ -206,6 +206,19 @@ def run_validation(wb, meta_conn, report, layout_version_id=1):
         'SELECT * FROM evca_sheet_blocks WHERE layout_version_id=? ORDER BY id',
         (layout_version_id,)
     ).fetchall()
+
+    expected_sheet_indices = sorted(set(b['sheet_index'] for b in blocks))
+    expected_count = len(expected_sheet_indices)
+    if num_sheets != expected_count:
+        report.error(
+            f'Sheet count mismatch: layout_version_id={layout_version_id} expects '
+            f'{expected_count} sheet(s) but this workbook has {num_sheets}. This usually '
+            f'means the spreadsheet template does not match this layout version. Verify '
+            f'the template version or register a new layout version in metadata.sql.'
+        )
+    else:
+        report.info(f'Sheet count matches layout_version_id={layout_version_id} ({expected_count} expected).')
+
     counts = {'PASS': 0, 'WARN!': 0, 'EMPTY': 0}
     critical_warn = False
     cur_sheet = None
@@ -218,9 +231,9 @@ def run_validation(wb, meta_conn, report, layout_version_id=1):
             if si not in missing_sheet_indices:
                 missing_sheet_indices.add(si)
                 report.error(
-                    f'Sheet {si} ("{block["sheet_name_english"]}") is expected by layout '
+                    f'Sheet {si + 1} ("{block["sheet_name_english"]}") is expected by layout '
                     f'version {layout_version_id} but this workbook only has {num_sheets} '
-                    f'sheet(s) (valid indices 0-{num_sheets - 1}). All blocks on this sheet '
+                    f'sheet(s) (valid sheet numbers 1-{num_sheets}). All blocks on this sheet '
                     f'will be skipped.'
                 )
             counts['WARN!'] += 1
@@ -230,7 +243,7 @@ def run_validation(wb, meta_conn, report, layout_version_id=1):
 
         if si != cur_sheet:
             cur_sheet = si
-            report.info(f'Sheet {si}: {block["sheet_name_english"]}')
+            report.info(f'Sheet {si + 1}: {block["sheet_name_english"]}')
         ws = sheets[si]
         status, details = _validate_block(block, ws, meta_conn)
         counts[status] += 1
@@ -248,8 +261,8 @@ def run_validation(wb, meta_conn, report, layout_version_id=1):
     if missing_sheet_indices:
         report.error(
             f'{len(missing_sheet_indices)} sheet(s) referenced by the layout metadata are '
-            f'missing from this workbook: indices {sorted(missing_sheet_indices)}. This '
-            f'usually means the spreadsheet template does not match '
+            f'missing from this workbook: sheet numbers {[i + 1 for i in sorted(missing_sheet_indices)]}. '
+            f'This usually means the spreadsheet template does not match '
             f'layout_version_id={layout_version_id} (e.g. a tab was removed, renamed, or '
             f'merged). Verify the template version or register a new layout version in '
             f'metadata.sql.'
