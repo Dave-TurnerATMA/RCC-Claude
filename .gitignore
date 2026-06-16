@@ -6,3 +6,5 @@ backend/dist/
 uploads/
 .env
 .env.local
+__pycache__/
+*.pyc
