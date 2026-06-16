@@ -813,6 +813,13 @@ def main():
 
         sheets = wb.worksheets
 
+        expected_sheet_indices = set(
+            r[0] for r in meta_conn.execute(
+                'SELECT DISTINCT sheet_index FROM evca_sheet_blocks WHERE layout_version_id=?',
+                (args.layout_version_id,)
+            ).fetchall()
+        )
+
         ws0 = safe_sheet(sheets, 0, 'Tab 1 (Assessment/Summary)', report)
         if ws0 is None:
             db_conn.execute(
@@ -834,12 +841,12 @@ def main():
             print(report.text())
             sys.exit(1)
 
-        ws1 = safe_sheet(sheets, 1, 'Tab 2', report)
+        ws1 = safe_sheet(sheets, 1, 'Tab 2', report) if 1 in expected_sheet_indices else None
         if ws1 is not None:
             import_tab2(ws1, db_conn, args.load_id, assessment_id, report)
 
         hazard_ids = []
-        ws2 = safe_sheet(sheets, 2, 'Tab 3 (Hazards)', report)
+        ws2 = safe_sheet(sheets, 2, 'Tab 3 (Hazards)', report) if 2 in expected_sheet_indices else None
         if ws2 is not None:
             hazard_ids = import_tab3_hazards(ws2, db_conn, args.load_id, assessment_id, report)
         if not hazard_ids:
@@ -847,31 +854,31 @@ def main():
 
         import_tab1_risk_summary(ws0, db_conn, args.load_id, assessment_id, hazard_ids, report)
 
-        ws3 = safe_sheet(sheets, 3, 'Tab 4', report)
+        ws3 = safe_sheet(sheets, 3, 'Tab 4', report) if 3 in expected_sheet_indices else None
         if ws3 is not None:
             import_tab4(ws3, db_conn, args.load_id, assessment_id, hazard_ids, report)
 
-        ws4 = safe_sheet(sheets, 4, 'Tab 5', report)
+        ws4 = safe_sheet(sheets, 4, 'Tab 5', report) if 4 in expected_sheet_indices else None
         if ws4 is not None:
             import_tab5(ws4, db_conn, args.load_id, assessment_id, hazard_ids, report)
 
-        ws5 = safe_sheet(sheets, 5, 'Tab 6', report)
+        ws5 = safe_sheet(sheets, 5, 'Tab 6', report) if 5 in expected_sheet_indices else None
         if ws5 is not None:
             import_tab6(ws5, db_conn, args.load_id, assessment_id, report)
 
-        ws6 = safe_sheet(sheets, 6, 'Tab 7', report)
+        ws6 = safe_sheet(sheets, 6, 'Tab 7', report) if 6 in expected_sheet_indices else None
         if ws6 is not None:
             import_tab7(ws6, db_conn, args.load_id, assessment_id, hazard_ids, report)
 
-        ws7 = safe_sheet(sheets, 7, 'Tab 8', report)
+        ws7 = safe_sheet(sheets, 7, 'Tab 8', report) if 7 in expected_sheet_indices else None
         if ws7 is not None:
             import_tab8(ws7, db_conn, args.load_id, assessment_id, hazard_ids, report)
 
-        ws8 = safe_sheet(sheets, 8, 'Tab 9', report)
+        ws8 = safe_sheet(sheets, 8, 'Tab 9', report) if 8 in expected_sheet_indices else None
         if ws8 is not None:
             import_tab9(ws8, db_conn, args.load_id, assessment_id, report)
 
-        ws9 = safe_sheet(sheets, 9, 'Tab 10 (Priority Scoring Matrix)', report)
+        ws9 = safe_sheet(sheets, 9, 'Tab 10 (Priority Scoring Matrix)', report) if 9 in expected_sheet_indices else None
         if ws9 is not None:
             import_tab10(ws9, db_conn, args.load_id, assessment_id, report)
 
