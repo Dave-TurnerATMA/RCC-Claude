@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import i18n from '../i18n';
 
-interface Team { id: number; name: string; code: string; }
+interface Team { id: number; name: string; }
 interface User { id: number; team_id: number; name: string; email: string; role: string; status: string; language: string; }
 
 interface AppContextType {

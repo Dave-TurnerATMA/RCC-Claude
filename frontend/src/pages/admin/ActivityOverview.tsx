@@ -142,8 +142,8 @@ export default function ActivityOverview() {
     });
   };
 
-  // Each required task is its own top-level item (no sub_tasks grouping in this backend)
-  const allRequiredTasks = mainTasks.map((rt: any) => ({ ...rt, _groupName: rt.short_description }));
+  // Flatten all required tasks from main_tasks
+  const allRequiredTasks = mainTasks.flatMap((mt: any) => (mt.sub_tasks || []).map((rt: any) => ({ ...rt, _groupName: mt.short_description })));
 
   const sortedByDateRts = [...allRequiredTasks].sort((a, b) => {
     const da = getRtEffectiveDate(a);
@@ -225,17 +225,38 @@ export default function ActivityOverview() {
             </div>
           ) : (
             <>
-              {mainTasks.map((rt: any) => (
-                <RtRow
-                  key={rt.id}
-                  rt={rt}
-                  displayState={getRtDisplayState(rt, stsByRtId)}
-                  effectiveDate={getRtEffectiveDate(rt)}
-                  showDate={false}
-                  showGroup={false}
-                  onClick={() => setEditTask(rt)}
-                />
-              ))}
+              {mainTasks.map(mt => {
+                const subTasks = mt.sub_tasks || [];
+                if (subTasks.length === 0) return null;
+                const expanded = expandedGroups.has(mt.id);
+                return (
+                  <div key={mt.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <button
+                      onClick={() => toggleGroup(mt.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100 text-left"
+                    >
+                      <span className="text-xs font-bold text-gray-700 flex-1">{mt.short_description}</span>
+                      <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded-full">{subTasks.length}</span>
+                      <span className="text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
+                    </button>
+                    {expanded && (
+                      <div>
+                        {subTasks.map((rt: any) => (
+                          <RtRow
+                            key={rt.id}
+                            rt={rt}
+                            displayState={getRtDisplayState(rt, stsByRtId)}
+                            effectiveDate={getRtEffectiveDate(rt)}
+                            showDate={false}
+                            showGroup={false}
+                            onClick={() => setEditTask(rt)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {allRequiredTasks.length === 0 && (
                 <div className="text-center py-16">
                   <div className="text-5xl mb-3">📋</div>

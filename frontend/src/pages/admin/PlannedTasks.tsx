@@ -544,7 +544,7 @@ function ScheduledTasksModal({ task, onClose }: { task: any; onClose: () => void
     setLoading(true);
     Promise.all([
       api.getScheduledTasks(team.id, { required_task_id: String(task.id) }),
-      api.getScheduledTasks(team.id, { required_task_id: String(task.id), state: 'completed' }),
+      api.getScheduledTaskHistory(team.id, { required_task_id: String(task.id) }),
     ]).then(([active, history]) => {
       setActiveTasks(active);
       setHistoryTasks(history);
