@@ -5,7 +5,7 @@ import { promoteNextPlannedTask } from '../services/scheduler';
 const router = Router();
 
 function enrichTask(task: any) {
-  task.crew = db.prepare('SELECT u.* FROM users u JOIN task_crew tc ON u.id = tc.user_id WHERE tc.scheduled_task_id = ?').all(task.id);
+  task.crew = db.prepare('SELECT u.*, cp.status, cp.source FROM users u JOIN crew_participation cp ON u.id = cp.user_id WHERE cp.scheduled_task_id = ?').all(task.id);
   task.equipment = db.prepare('SELECT e.* FROM equipment e JOIN task_equipment te ON e.id = te.equipment_id WHERE te.scheduled_task_id = ?').all(task.id);
   task.notes = db.prepare('SELECT n.*, u.name as user_name FROM task_notes n JOIN users u ON n.user_id = u.id WHERE n.scheduled_task_id = ? ORDER BY n.created_at ASC').all(task.id);
   task.uploads = db.prepare('SELECT * FROM task_uploads WHERE scheduled_task_id = ? ORDER BY created_at DESC').all(task.id);
@@ -31,7 +31,7 @@ router.get('/:teamId/scheduled-tasks', (req, res) => {
   if (type) { query += ` AND st.type = ?`; params.push(type); }
 
   if (view === 'mine' && user_id) {
-    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM task_crew tc WHERE tc.scheduled_task_id = st.id AND tc.user_id = ?) OR st.crew_type IN ('open_optional','all_expected'))`;
+    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.user_id = ?) OR st.crew_type IN ('open_optional','all_expected'))`;
     params.push(user_id, user_id);
   } else if (view === 'responsible' && user_id) {
     query += ` AND st.responsible_user_id = ?`;
@@ -61,7 +61,7 @@ router.get('/:teamId/scheduled-tasks/history', (req, res) => {
   `;
   const params: any[] = [req.params.teamId];
   if (user_id) {
-    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM task_crew tc WHERE tc.scheduled_task_id = st.id AND tc.user_id = ?))`;
+    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.user_id = ?))`;
     params.push(user_id, user_id);
   }
   query += ' ORDER BY st.completed_at DESC LIMIT 50';
@@ -90,7 +90,7 @@ router.post('/:teamId/scheduled-tasks', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(req.params.teamId, required_task_id || null, parent_task_id || null, type, short_description, overview, scheduled_date || null, priority, responsible_user_id || null, estimate_hours || null, planning_notes || null, crew_type || 'specific').lastInsertRowid as number;
 
-  if (crew_ids) for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(id, uid);
+  if (crew_ids) for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source) VALUES (?, ?, ?)').run(id, uid, 'manually_added');
   if (equipment_ids) for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(id, eqId);
 
   const task = db.prepare('SELECT * FROM scheduled_tasks WHERE id = ?').get(id) as any;
@@ -121,8 +121,8 @@ router.put('/:teamId/scheduled-tasks/:id', (req, res) => {
     estimate_hours || null, planning_notes || null, feedback_notes || null, crew_type || null, state || null, req.params.id);
 
   if (crew_ids !== undefined) {
-    db.prepare('DELETE FROM task_crew WHERE scheduled_task_id = ?').run(req.params.id);
-    for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(req.params.id, uid);
+    db.prepare('DELETE FROM crew_participation WHERE scheduled_task_id = ?').run(req.params.id);
+    for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source) VALUES (?, ?, ?)').run(req.params.id, uid, 'manually_added');
   }
   if (equipment_ids !== undefined) {
     db.prepare('DELETE FROM task_equipment WHERE scheduled_task_id = ?').run(req.params.id);
@@ -148,7 +148,7 @@ router.post('/:teamId/scheduled-tasks/:id/complete', (req, res) => {
     WHERE id = ?
   `).run(finalState, completed_at || new Date().toISOString(), work_description || null, actual_hours || null, problems || null, feedback_notes || work_description || null, req.params.id);
 
-  if (additional_crew_ids) for (const uid of additional_crew_ids) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(req.params.id, uid);
+  if (additional_crew_ids) for (const uid of additional_crew_ids) db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source) VALUES (?, ?, ?)').run(req.params.id, uid, 'manually_added');
   if (equipment_ids !== undefined) {
     db.prepare('DELETE FROM task_equipment WHERE scheduled_task_id = ?').run(req.params.id);
     for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(req.params.id, eqId);
@@ -181,7 +181,7 @@ router.post('/:teamId/scheduled-tasks/:id/progress', (req, res) => {
     WHERE id = ? AND team_id = ?
   `).run(work_description || null, problems || null, planning_notes || null, req.params.id, req.params.teamId);
 
-  if (additional_crew_ids) for (const uid of additional_crew_ids) db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(req.params.id, uid);
+  if (additional_crew_ids) for (const uid of additional_crew_ids) db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source) VALUES (?, ?, ?)').run(req.params.id, uid, 'manually_added');
   if (equipment_ids !== undefined) {
     db.prepare('DELETE FROM task_equipment WHERE scheduled_task_id = ?').run(req.params.id);
     for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(req.params.id, eqId);
@@ -190,13 +190,18 @@ router.post('/:teamId/scheduled-tasks/:id/progress', (req, res) => {
 });
 
 router.post('/:teamId/scheduled-tasks/:id/crew', (req, res) => {
-  const { user_id } = req.body;
-  db.prepare('INSERT OR IGNORE INTO task_crew VALUES (?, ?)').run(req.params.id, user_id);
+  const { user_id, source, added_by_user_id } = req.body;
+  db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source, added_by_user_id) VALUES (?, ?, ?, ?)').run(req.params.id, user_id, source || 'manually_added', added_by_user_id || null);
+  res.json({ success: true });
+});
+
+router.post('/:teamId/scheduled-tasks/:id/crew/:userId/confirm', (req, res) => {
+  db.prepare("UPDATE crew_participation SET status = 'confirmed', confirmed_at = datetime('now') WHERE scheduled_task_id = ? AND user_id = ?").run(req.params.id, req.params.userId);
   res.json({ success: true });
 });
 
 router.delete('/:teamId/scheduled-tasks/:id/crew/:userId', (req, res) => {
-  db.prepare('DELETE FROM task_crew WHERE scheduled_task_id = ? AND user_id = ?').run(req.params.id, req.params.userId);
+  db.prepare('DELETE FROM crew_participation WHERE scheduled_task_id = ? AND user_id = ?').run(req.params.id, req.params.userId);
   res.json({ success: true });
 });
 
