@@ -15,7 +15,6 @@ function enrichTask(task: any) {
 router.get('/:teamId/scheduled-tasks', (req, res) => {
   const { state, type, view, user_id, order } = req.query as any;
 
-  // Auto-update missed tasks
   db.prepare("UPDATE scheduled_tasks SET state = 'missed', updated_at = datetime('now') WHERE team_id = ? AND state = 'planned' AND scheduled_date < date('now')").run(req.params.teamId);
 
   let query = `
@@ -31,7 +30,7 @@ router.get('/:teamId/scheduled-tasks', (req, res) => {
   if (type) { query += ` AND st.type = ?`; params.push(type); }
 
   if (view === 'mine' && user_id) {
-    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.user_id = ?) OR st.crew_type IN ('open_optional','all_expected'))`;
+    query += ` AND (st.responsible_user_id = ? OR EXISTS (SELECT 1 FROM crew_participation cp WHERE cp.scheduled_task_id = st.id AND cp.user_id = ?) OR st.participants IN ('open_optional','all_expected'))`;
     params.push(user_id, user_id);
   } else if (view === 'responsible' && user_id) {
     query += ` AND st.responsible_user_id = ?`;
@@ -82,13 +81,14 @@ router.get('/:teamId/scheduled-tasks/:id', (req, res) => {
 });
 
 router.post('/:teamId/scheduled-tasks', (req, res) => {
-  const { type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, crew_ids, equipment_ids, crew_type, required_task_id, parent_task_id } = req.body;
-  if (!type || !short_description || !overview || !priority) return res.status(400).json({ error: 'Missing required fields' });
+  const { type, short_description, task_overview, overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, crew_ids, equipment_ids, participants, crew_type, required_task_id, parent_scheduled_task_id, parent_task_id, participation_type } = req.body;
+  const desc = task_overview || overview;
+  if (!type || !short_description || !desc || !priority) return res.status(400).json({ error: 'Missing required fields' });
 
   const id = db.prepare(`
-    INSERT INTO scheduled_tasks (team_id, required_task_id, parent_task_id, type, short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, crew_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(req.params.teamId, required_task_id || null, parent_task_id || null, type, short_description, overview, scheduled_date || null, priority, responsible_user_id || null, estimate_hours || null, planning_notes || null, crew_type || 'specific').lastInsertRowid as number;
+    INSERT INTO scheduled_tasks (team_id, required_task_id, parent_scheduled_task_id, type, short_description, task_overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, participants, participation_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.params.teamId, required_task_id || null, parent_scheduled_task_id || parent_task_id || null, type, short_description, desc, scheduled_date || null, priority, responsible_user_id || null, estimate_hours || null, planning_notes || null, participants || crew_type || 'crew', participation_type || 'picked').lastInsertRowid as number;
 
   if (crew_ids) for (const uid of crew_ids) db.prepare('INSERT OR IGNORE INTO crew_participation (scheduled_task_id, user_id, source) VALUES (?, ?, ?)').run(id, uid, 'manually_added');
   if (equipment_ids) for (const eqId of equipment_ids) db.prepare('INSERT OR IGNORE INTO task_equipment VALUES (?, ?)').run(id, eqId);
@@ -98,27 +98,29 @@ router.post('/:teamId/scheduled-tasks', (req, res) => {
 });
 
 router.put('/:teamId/scheduled-tasks/:id', (req, res) => {
-  const { short_description, overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, feedback_notes, crew_type, state, crew_ids, equipment_ids } = req.body;
+  const { short_description, task_overview, overview, scheduled_date, priority, responsible_user_id, estimate_hours, planning_notes, feedback_notes, participants, crew_type, participation_type, state, crew_ids, equipment_ids } = req.body;
   const existing = db.prepare('SELECT * FROM scheduled_tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.params.teamId) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
   db.prepare(`
     UPDATE scheduled_tasks SET
       short_description = COALESCE(?, short_description),
-      overview = COALESCE(?, overview),
+      task_overview = COALESCE(?, task_overview),
       scheduled_date = COALESCE(?, scheduled_date),
       priority = COALESCE(?, priority),
       responsible_user_id = ?,
       estimate_hours = COALESCE(?, estimate_hours),
       planning_notes = COALESCE(?, planning_notes),
       feedback_notes = COALESCE(?, feedback_notes),
-      crew_type = COALESCE(?, crew_type),
+      participants = COALESCE(?, participants),
+      participation_type = COALESCE(?, participation_type),
       state = COALESCE(?, state),
       updated_at = datetime('now')
     WHERE id = ?
-  `).run(short_description || null, overview || null, scheduled_date || null, priority || null,
+  `).run(short_description || null, task_overview || overview || null, scheduled_date || null, priority || null,
     responsible_user_id !== undefined ? responsible_user_id : existing.responsible_user_id,
-    estimate_hours || null, planning_notes || null, feedback_notes || null, crew_type || null, state || null, req.params.id);
+    estimate_hours || null, planning_notes || null, feedback_notes || null,
+    participants || crew_type || null, participation_type || null, state || null, req.params.id);
 
   if (crew_ids !== undefined) {
     db.prepare('DELETE FROM crew_participation WHERE scheduled_task_id = ?').run(req.params.id);
@@ -140,7 +142,7 @@ router.post('/:teamId/scheduled-tasks/:id/complete', (req, res) => {
   if (task.state !== 'pending') return res.status(400).json({ error: 'Only pending tasks can be completed' });
 
   const finalState = newState || 'completed';
-  if (task.type === 'scheduled' && finalState === 'abandoned') return res.status(400).json({ error: 'Scheduled (recurring) tasks cannot be abandoned' });
+  if (task.type === 'recurring' && finalState === 'abandoned') return res.status(400).json({ error: 'Recurring tasks cannot be abandoned' });
 
   db.prepare(`
     UPDATE scheduled_tasks SET
@@ -157,19 +159,18 @@ router.post('/:teamId/scheduled-tasks/:id/complete', (req, res) => {
   let followUpId = null;
   if (follow_up_task && follow_up_task.short_description) {
     followUpId = db.prepare(`
-      INSERT INTO scheduled_tasks (team_id, parent_task_id, type, short_description, overview, priority, responsible_user_id, estimate_hours, planning_notes)
+      INSERT INTO scheduled_tasks (team_id, parent_scheduled_task_id, type, short_description, task_overview, priority, responsible_user_id, estimate_hours, planning_notes)
       VALUES (?, ?, 'follow_up', ?, ?, ?, ?, ?, ?)
-    `).run(req.params.teamId, req.params.id, follow_up_task.short_description, follow_up_task.overview || '', follow_up_task.priority || 'medium', follow_up_task.responsible_user_id || null, follow_up_task.estimate_hours || null, follow_up_task.planning_notes || null).lastInsertRowid;
+    `).run(req.params.teamId, req.params.id, follow_up_task.short_description, follow_up_task.overview || follow_up_task.task_overview || '', follow_up_task.priority || 'medium', follow_up_task.responsible_user_id || null, follow_up_task.estimate_hours || null, follow_up_task.planning_notes || null).lastInsertRowid;
   }
 
-  if (task.type === 'scheduled' && task.required_task_id && finalState === 'completed') {
+  if (task.type === 'recurring' && task.required_task_id && finalState === 'completed') {
     promoteNextPlannedTask(task.required_task_id, Number(req.params.teamId));
   }
 
   res.json({ success: true, follow_up_id: followUpId });
 });
 
-// Progress update (without completing)
 router.post('/:teamId/scheduled-tasks/:id/progress', (req, res) => {
   const { work_description, problems, additional_crew_ids, equipment_ids, planning_notes } = req.body;
   db.prepare(`
@@ -211,6 +212,16 @@ router.post('/:teamId/scheduled-tasks/:id/notes', (req, res) => {
   const id = db.prepare('INSERT INTO task_notes (scheduled_task_id, user_id, note) VALUES (?, ?, ?)').run(req.params.id, user_id, note).lastInsertRowid;
   const noteRecord = db.prepare('SELECT n.*, u.name as user_name FROM task_notes n JOIN users u ON n.user_id = u.id WHERE n.id = ?').get(id);
   res.json(noteRecord);
+});
+
+router.post('/:teamId/scheduled-tasks/:id/step-checks', (req, res) => {
+  const { step_id, checked, user_id } = req.body;
+  if (checked) {
+    db.prepare('INSERT OR REPLACE INTO scheduled_task_step_checks (scheduled_task_id, step_id, checked_by_user_id) VALUES (?, ?, ?)').run(req.params.id, step_id, user_id || null);
+  } else {
+    db.prepare('DELETE FROM scheduled_task_step_checks WHERE scheduled_task_id = ? AND step_id = ?').run(req.params.id, step_id);
+  }
+  res.json({ success: true });
 });
 
 router.post('/:teamId/scheduled-tasks/:id/request-takeover', (req, res) => {
