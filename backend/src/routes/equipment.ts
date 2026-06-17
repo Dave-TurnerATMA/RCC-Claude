@@ -4,7 +4,7 @@ import db from '../db/database';
 const router = Router();
 
 router.get('/:teamId/equipment', (req, res) => {
-  const items = db.prepare('SELECT * FROM equipment WHERE team_id = ? AND deleted = 0 ORDER BY name_en').all(req.params.teamId);
+  const items = db.prepare('SELECT * FROM equipment WHERE team_id = ? ORDER BY name_en').all(req.params.teamId);
   res.json(items);
 });
 
