@@ -34,8 +34,7 @@ export default function TeamActivity() {
     setLoading(true);
     try {
       const params: any = { order };
-      if (stateFilter === 'active') params.state = 'active';
-      else if (stateFilter !== 'all') params.state = stateFilter;
+      if (stateFilter !== 'active' && stateFilter !== 'all') params.state = stateFilter;
       if (filter === 'unassigned') params.view = 'unassigned';
       else if (filter === 'responsible') { params.view = 'responsible'; params.user_id = String(user!.id); }
       else if (filter === 'involved') { params.view = 'involved'; params.user_id = String(user!.id); }
