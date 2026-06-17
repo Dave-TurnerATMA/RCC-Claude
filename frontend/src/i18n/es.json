@@ -60,7 +60,8 @@
     "completed": "Completado",
     "abandoned": "Abandonado",
     "not_required": "No Requerido",
-    "missed": "Perdido"
+    "missed": "Perdido",
+    "active": "Todos"
   },
   "type": {
     "scheduled": "Programado",

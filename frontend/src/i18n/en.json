@@ -60,7 +60,8 @@
     "completed": "Completed",
     "abandoned": "Abandoned",
     "not_required": "Not Required",
-    "missed": "Missed"
+    "missed": "Missed",
+    "active": "All"
   },
   "type": {
     "scheduled": "Scheduled",

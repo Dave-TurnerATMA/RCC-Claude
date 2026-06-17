@@ -21,10 +21,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const adminTabs = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: '📊' },
     { path: '/admin/activity', label: t('nav.activityOverview'), icon: '📋' },
-    { path: '/admin/planned-tasks', label: t('nav.plannedTasks'), icon: '🔄' },
+    { path: '/admin/required-tasks', label: t('nav.plannedTasks'), icon: '🔄' },
     { path: '/admin/resources', label: t('nav.resources'), icon: '🛠️' },
     { path: '/admin/team-members', label: t('nav.teamMembers'), icon: '👥' },
-    { path: '/admin/required-tasks', label: t('nav.requiredTasks'), icon: '⚙️' },
     { path: '/admin/reference', label: t('nav.reference'), icon: '📚' },
     { path: '/admin/spreadsheet', label: 'Spreadsheet', icon: '📁' },
   ];
