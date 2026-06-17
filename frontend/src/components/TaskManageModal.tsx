@@ -9,6 +9,7 @@ import StateBadge from './StateBadge';
 interface Props {
   task: any;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 export default function TaskManageModal({ task: initialTask, onClose }: Props) {

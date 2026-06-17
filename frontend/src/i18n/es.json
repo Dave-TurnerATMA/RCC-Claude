@@ -13,7 +13,11 @@
     "requiredTasks": "Tareas Requeridas",
     "resources": "Recursos",
     "teamMembers": "Miembros del Equipo",
-    "reference": "Referencia"
+    "reference": "Referencia",
+    "happening": "Qué Pasa",
+    "teamActivity": "Actividad del Equipo",
+    "activityOverview": "Resumen de Actividades",
+    "plannedTasks": "Tareas Planificadas"
   },
   "common": {
     "save": "Guardar",

@@ -2,10 +2,15 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from './contexts/AppContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import TeamSchedule from './pages/execution/TeamSchedule';
+import WhatsHappening from './pages/execution/WhatsHappening';
 import YourSchedule from './pages/execution/YourSchedule';
+import TeamSchedule from './pages/execution/TeamSchedule';
+import TeamActivity from './pages/execution/TeamActivity';
+import Volunteer from './pages/execution/Volunteer';
 import YourHistory from './pages/execution/YourHistory';
 import Dashboard from './pages/admin/Dashboard';
+import ActivityOverview from './pages/admin/ActivityOverview';
+import PlannedTasks from './pages/admin/PlannedTasks';
 import RequiredTasks from './pages/admin/RequiredTasks';
 import Resources from './pages/admin/Resources';
 import TeamMembers from './pages/admin/TeamMembers';
@@ -21,7 +26,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { team, user, isAdmin } = useApp();
   if (!team || !user) return <Navigate to="/" replace />;
-  if (!isAdmin) return <Navigate to="/schedule" replace />;
+  if (!isAdmin) return <Navigate to="/happening" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -30,11 +35,16 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={team && user ? <Navigate to="/schedule" replace /> : <Login />} />
-      <Route path="/schedule" element={<ProtectedRoute><TeamSchedule /></ProtectedRoute>} />
-      <Route path="/my-schedule" element={<ProtectedRoute><YourSchedule /></ProtectedRoute>} />
+      <Route path="/" element={team && user ? <Navigate to="/happening" replace /> : <Login />} />
+      <Route path="/happening" element={<ProtectedRoute><WhatsHappening /></ProtectedRoute>} />
+      <Route path="/schedule" element={<ProtectedRoute><YourSchedule /></ProtectedRoute>} />
+      <Route path="/team-schedule" element={<ProtectedRoute><TeamSchedule /></ProtectedRoute>} />
+      <Route path="/team-activity" element={<ProtectedRoute><TeamActivity /></ProtectedRoute>} />
+      <Route path="/volunteer" element={<ProtectedRoute><Volunteer /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><YourHistory /></ProtectedRoute>} />
       <Route path="/admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+      <Route path="/admin/activity" element={<AdminRoute><ActivityOverview /></AdminRoute>} />
+      <Route path="/admin/planned-tasks" element={<AdminRoute><PlannedTasks /></AdminRoute>} />
       <Route path="/admin/required-tasks" element={<AdminRoute><RequiredTasks /></AdminRoute>} />
       <Route path="/admin/resources" element={<AdminRoute><Resources /></AdminRoute>} />
       <Route path="/admin/team-members" element={<AdminRoute><TeamMembers /></AdminRoute>} />

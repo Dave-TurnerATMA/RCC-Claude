@@ -13,7 +13,11 @@
     "requiredTasks": "Required Tasks",
     "resources": "Resources",
     "teamMembers": "Team Members",
-    "reference": "Reference"
+    "reference": "Reference",
+    "happening": "What's Happening",
+    "teamActivity": "Team Activity",
+    "activityOverview": "Activity Overview",
+    "plannedTasks": "Planned Tasks"
   },
   "common": {
     "save": "Save",

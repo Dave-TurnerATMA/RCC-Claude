@@ -32,6 +32,12 @@ export const api = {
   getTaskSummary: (teamId: number, id: number) => api.get(`/teams/${teamId}/required-tasks/${id}/summary`),
   createRequiredTask: (teamId: number, data: any) => api.post(`/teams/${teamId}/required-tasks`, data),
   updateRequiredTask: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/required-tasks/${id}`, data),
+  archiveRequiredTask: (teamId: number, id: number, data?: any) => api.post(`/teams/${teamId}/required-tasks/${id}/archive`, data || {}),
+  getRequiredTaskLogs: (teamId: number, id: number) => api.get(`/teams/${teamId}/required-tasks/${id}/logs`),
+  getMainTasks: (teamId: number) => api.get(`/teams/${teamId}/required-tasks`),
+  createMainTask: (teamId: number, data: any) => api.post(`/teams/${teamId}/required-tasks`, data),
+  updateMainTask: (teamId: number, id: number, data: any) => api.put(`/teams/${teamId}/required-tasks/${id}`, data),
+  deleteMainTask: (teamId: number, id: number) => api.delete(`/teams/${teamId}/required-tasks/${id}`),
 
   // Scheduled Tasks
   getScheduledTasks: (teamId: number, params: Record<string, string> = {}) => {

@@ -13,7 +13,11 @@
     "requiredTasks": "Tugas Wajib",
     "resources": "Sumber Daya",
     "teamMembers": "Anggota Tim",
-    "reference": "Referensi"
+    "reference": "Referensi",
+    "happening": "Yang Terjadi",
+    "teamActivity": "Aktivitas Tim",
+    "activityOverview": "Ikhtisar Aktivitas",
+    "plannedTasks": "Tugas Terencana"
   },
   "common": {
     "save": "Simpan",
