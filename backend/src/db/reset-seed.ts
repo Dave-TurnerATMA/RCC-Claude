@@ -23,6 +23,10 @@ db.exec(`
   DELETE FROM equipment;
   DELETE FROM users;
   DELETE FROM teams;
+  DELETE FROM sqlite_sequence WHERE name IN (
+    'notifications','task_notes','scheduled_tasks','required_task_logs',
+    'required_tasks','equipment','users','teams'
+  );
 `);
 
 console.log('All app tables cleared.');
