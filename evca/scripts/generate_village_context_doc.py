@@ -104,11 +104,16 @@ and when it should be refreshed.
 """
 
 
-def build_user_prompt(assessment: dict) -> str:
+def build_user_prompt(assessment: dict, full: bool = True) -> str:
     village = assessment.get("village_profile", {}).get("village_name", f"Assessment {assessment['assessment_id']}")
     data_json = json.dumps(assessment, indent=2, ensure_ascii=False)
 
-    return f"""{SEPARATOR}
+    framework_section = f"""{EVCA_FRAMEWORK_CONTEXT}
+
+
+""" if full else ""
+
+    return f"""{framework_section}{SEPARATOR}
 VILLAGE-SPECIFIC ASSESSMENT DATA — {village.upper()}
 {SEPARATOR}
 
@@ -145,6 +150,8 @@ def main() -> None:
     parser.add_argument("--db", required=True, help="Path to community_prep.db SQLite database")
     parser.add_argument("--assessment-id", type=int, required=True, help="Assessment ID to process")
     parser.add_argument("--output", help="Write markdown document to this file instead of stdout")
+    parser.add_argument("--mode", choices=["full", "fast"], default="full",
+                        help="full: include EVCA framework context (more tokens); fast: village data only")
     args = parser.parse_args()
 
     if not os.path.exists(args.db):
@@ -163,7 +170,7 @@ def main() -> None:
         conn.close()
 
     village_name = assessment.get("village_profile", {}).get("village_name", f"Assessment {args.assessment_id}")
-    user_prompt = build_user_prompt(assessment)
+    user_prompt = build_user_prompt(assessment, full=(args.mode == "full"))
 
     client = anthropic.Anthropic()
     for attempt in range(3):

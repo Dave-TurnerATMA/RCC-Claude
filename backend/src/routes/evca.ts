@@ -231,7 +231,8 @@ function buildManagementPage(flash?: { type: 'ok' | 'err'; msg: string }, autoEx
                 ? `<a class="btn" style="background:#8e44ad" href="/evca/loads/${r.id}/assessment-view" target="_blank">Assessment Report</a> ` +
                   `<a class="btn" style="background:#2c3e50" href="/evca/loads/${r.id}/assessment.json?download=1">⬇ JSON</a> ` +
                   `<a class="btn" style="background:#16a085" href="/evca/loads/${r.id}/prompt.txt?download=1">⬇ LLM Prompt</a> ` +
-      `<a class="btn" style="background:#1a5276" href="/evca/loads/${r.id}/context-doc.md?download=1">⬇ Context Doc</a>`
+      `<a class="btn" style="background:#1a5276" href="/evca/loads/${r.id}/context-doc-full.md?download=1">⬇ Context Doc (Full)</a> ` +
+      `<a class="btn" style="background:#2e86c1" href="/evca/loads/${r.id}/context-doc-fast.md?download=1">⬇ Context Doc (Fast)</a>`
                 : '';
               return `<tr>
                 <td>${fmt(r.id)}</td>
@@ -874,18 +875,18 @@ function runPromptScript(assessmentId: number): Promise<string> {
   });
 }
 
-function runContextDocScript(assessmentId: number): Promise<string> {
+function runContextDocScript(assessmentId: number, mode: 'full' | 'fast'): Promise<string> {
   const scriptPath = path.resolve(__dirname, '../../../evca/scripts/generate_village_context_doc.py');
   const dbPath     = path.resolve(__dirname, '../../data/community_prep.db');
+  let apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+  if (!apiKey) {
+    try {
+      const eco = require('../../../ecosystem.config.js');
+      apiKey = eco?.apps?.[0]?.env?.ANTHROPIC_API_KEY ?? '';
+    } catch {}
+  }
   return new Promise((resolve, reject) => {
-    let apiKey = process.env.ANTHROPIC_API_KEY ?? '';
-    if (!apiKey) {
-      try {
-        const eco = require('../../../ecosystem.config.js');
-        apiKey = eco?.apps?.[0]?.env?.ANTHROPIC_API_KEY ?? '';
-      } catch {}
-    }
-    execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId)],
+    execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId), '--mode', mode],
       { timeout: 300_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ANTHROPIC_API_KEY: apiKey } },
       (error, stdout, stderr) => {
         if (error) return reject(new Error(stderr || error.message));
@@ -1020,7 +1021,7 @@ router.get('/loads/:id/prompt.txt', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/loads/:id/context-doc.md', async (req: Request, res: Response) => {
+async function serveContextDoc(req: Request, res: Response, mode: 'full' | 'fast') {
   const load = db.prepare('SELECT * FROM evca_spreadsheet_loads WHERE id=?').get(req.params.id) as any;
   if (!load) return res.status(404).send('Load not found');
   if (load.status !== 'success') return res.status(400).send('Load is not successful');
@@ -1029,8 +1030,9 @@ router.get('/loads/:id/context-doc.md', async (req: Request, res: Response) => {
   if (!assessment) return res.status(404).send('No assessment found for this load');
 
   try {
-    const markdown = await runContextDocScript(assessment.id);
-    const filename = `evca_${(assessment.village_name ?? 'assessment').replace(/\s+/g, '_')}_run${load.id}_context.md`;
+    const markdown = await runContextDocScript(assessment.id, mode);
+    const village = (assessment.village_name ?? 'assessment').replace(/\s+/g, '_');
+    const filename = `evca_${village}_run${load.id}_context_${mode}.md`;
     if (req.query.download === '1') {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     }
@@ -1039,7 +1041,10 @@ router.get('/loads/:id/context-doc.md', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).send(`Error generating context document: ${err.message}`);
   }
-});
+}
+
+router.get('/loads/:id/context-doc-full.md', (req: Request, res: Response) => serveContextDoc(req, res, 'full'));
+router.get('/loads/:id/context-doc-fast.md', (req: Request, res: Response) => serveContextDoc(req, res, 'fast'));
 
 router.get('/report', (req: Request, res: Response) => {
   let loadIds: number[] | undefined;
