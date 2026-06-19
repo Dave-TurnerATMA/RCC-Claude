@@ -17,6 +17,8 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
+import time
+
 import anthropic
 from evca_context import EVCA_FRAMEWORK_CONTEXT
 from get_village_assessment import get_village_assessment
@@ -167,12 +169,21 @@ def main() -> None:
     user_prompt = build_user_prompt(assessment)
 
     client = anthropic.Anthropic()
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=6000,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}]
-    )
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=6000,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            break
+        except anthropic.RateLimitError:
+            if attempt == 2:
+                raise
+            wait = 65 * (attempt + 1)
+            print(f"Rate limited — waiting {wait}s before retry {attempt + 2}/3...", file=sys.stderr)
+            time.sleep(wait)
 
     document_text = response.content[0].text
 
