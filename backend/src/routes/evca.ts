@@ -878,8 +878,15 @@ function runContextDocScript(assessmentId: number): Promise<string> {
   const scriptPath = path.resolve(__dirname, '../../../evca/scripts/generate_village_context_doc.py');
   const dbPath     = path.resolve(__dirname, '../../data/community_prep.db');
   return new Promise((resolve, reject) => {
+    let apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+    if (!apiKey) {
+      try {
+        const eco = require('../../../ecosystem.config.js');
+        apiKey = eco?.apps?.[0]?.env?.ANTHROPIC_API_KEY ?? '';
+      } catch {}
+    }
     execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId)],
-      { timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '' } },
+      { timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ANTHROPIC_API_KEY: apiKey } },
       (error, stdout, stderr) => {
         if (error) return reject(new Error(stderr || error.message));
         resolve(stdout);
