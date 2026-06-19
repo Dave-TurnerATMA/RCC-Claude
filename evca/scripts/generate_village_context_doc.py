@@ -108,10 +108,7 @@ def build_user_prompt(assessment: dict) -> str:
     village = assessment.get("village_profile", {}).get("village_name", f"Assessment {assessment['assessment_id']}")
     data_json = json.dumps(assessment, indent=2, ensure_ascii=False)
 
-    return f"""{EVCA_FRAMEWORK_CONTEXT}
-
-
-{SEPARATOR}
+    return f"""{SEPARATOR}
 VILLAGE-SPECIFIC ASSESSMENT DATA — {village.upper()}
 {SEPARATOR}
 
