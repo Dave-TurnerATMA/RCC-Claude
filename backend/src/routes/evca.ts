@@ -222,17 +222,21 @@ function buildManagementPage(flash?: { type: 'ok' | 'err'; msg: string }, autoEx
             <tbody>
             ${runs.map((r: any) => {
               const reportBtn = r.report
-                ? `<button class="btn btn-report" onclick="openReport(${r.id})">Report</button> `
+                ? `<button class="btn btn-report" onclick="openReport(${r.id})">Run Report</button> `
                 : '';
               const viewBtn = r.status === 'success'
-                ? `<a class="btn btn-view" href="/evca/report?run=${r.id}" target="_blank">View Data</a>`
+                ? `<a class="btn btn-view" href="/evca/report?run=${r.id}" target="_blank">View Data</a> `
+                : '';
+              const assessmentBtns = r.status === 'success'
+                ? `<a class="btn" style="background:#8e44ad" href="/evca/loads/${r.id}/assessment-view" target="_blank">Assessment Report</a> ` +
+                  `<a class="btn" style="background:#2c3e50" href="/evca/loads/${r.id}/assessment.json?download=1">⬇ JSON</a>`
                 : '';
               return `<tr>
                 <td>${fmt(r.id)}</td>
                 <td>${fmt(r.lv_name || r.layout_version_id || 1)}</td>
                 <td>${statusBadge(r.status)}</td>
                 <td>${fmt(r.uploaded_at)}</td>
-                <td>${reportBtn}${viewBtn}</td>
+                <td>${reportBtn}${viewBtn}${assessmentBtns}</td>
               </tr>`;
             }).join('')}
             </tbody>
@@ -836,6 +840,126 @@ router.get('/loads/:id/report', (req: Request, res: Response) => {
   if (!load) return res.status(404).send('<h2>Run not found</h2>');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(buildPopupReport(load));
+});
+
+// ── assessment JSON generation ─────────────────────────────────────────────────
+
+function runAssessmentScript(assessmentId: number): Promise<string> {
+  const scriptPath = path.resolve(__dirname, '../../../evca/scripts/get_village_assessment.py');
+  const dbPath     = path.resolve(__dirname, '../../data/community_prep.db');
+  return new Promise((resolve, reject) => {
+    execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId)],
+      { timeout: 30_000 },
+      (error, stdout, stderr) => {
+        if (error) return reject(new Error(stderr || error.message));
+        resolve(stdout);
+      }
+    );
+  });
+}
+
+function buildAssessmentPreview(json: any, runId: number): string {
+  const v = json.village_profile ?? {};
+  const profile = Object.entries(v).map(([k, val]) =>
+    `<tr><th>${esc(k.replace(/_/g, ' '))}</th><td>${esc(String(val))}</td></tr>`
+  ).join('');
+
+  const hazardsHtml = (json.hazards ?? []).map((h: any, i: number) => {
+    const riskRows = (h.risk_by_dimension ?? []).map((r: any) =>
+      `<tr><td>${esc(r.dimension)}</td><td>${badge(r.risk_level)}</td></tr>`
+    ).join('');
+    return `<div class="card">
+      <h3>Hazard ${i + 1}: ${esc(h.hazard_name)}</h3>
+      <div class="body">
+        ${h.cause_origin ? `<p><strong>Cause:</strong> ${esc(h.cause_origin)}</p>` : ''}
+        ${h.warning_signs ? `<p><strong>Warning signs:</strong> ${esc(h.warning_signs)}</p>` : ''}
+        ${h.frequency ? `<p><strong>Frequency:</strong> ${esc(h.frequency)}${h.occurrence_period ? ' · ' + esc(h.occurrence_period) : ''}</p>` : ''}
+        ${riskRows ? `<h4 style="margin:10px 0 4px">Risk by dimension</h4>
+          <table class="dt"><thead><tr><th>Dimension</th><th>Risk</th></tr></thead><tbody>${riskRows}</tbody></table>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const actionRows = (json.action_plan?.items ?? []).map((a: any, i: number) =>
+    `<tr><td>${i + 1}</td><td>${esc(a.priority_risk ?? '')}</td><td>${esc(a.desired_outcome ?? '')}</td><td>${esc(a.priority_activities ?? '')}</td><td>${esc(a.responsible_party ?? '')}</td></tr>`
+  ).join('');
+
+  const narratives = json.narratives ?? {};
+  const narrativeCards = Object.entries(narratives).map(([k, v]) =>
+    `<div class="card"><h3>${esc(k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</h3>
+    <div class="body"><p style="line-height:1.7">${esc(String(v)).replace(/\n/g, '<br>')}</p></div></div>`
+  ).join('');
+
+  return `<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assessment Report — ${esc(v.village_name ?? '')}</title>
+<style>${CSS}
+h4{margin:8px 0 4px;font-size:12px;color:#555}
+p{margin:4px 0;font-size:13px}
+</style>
+</head>
+<body>
+<h1>Assessment Report <small>${esc(v.village_name ?? '')}${v.district ? ' · ' + esc(v.district) : ''}${v.province ? ', ' + esc(v.province) : ''}</small>
+  <a href="/evca/loads/${runId}/assessment.json?download=1">⬇ Download JSON</a>
+</h1>
+<div class="page">
+  <div class="card"><h3>Village Profile</h3><div class="body">
+    <table class="kv">${profile}</table>
+  </div></div>
+  ${hazardsHtml}
+  ${narrativeCards}
+  ${actionRows ? `<div class="card"><h3>Action Plan</h3><div class="body">
+    <div class="scroll"><table class="dt">
+      <thead><tr><th>#</th><th>Priority Risk</th><th>Desired Outcome</th><th>Activities</th><th>Responsible</th></tr></thead>
+      <tbody>${actionRows}</tbody>
+    </table></div>
+  </div></div>` : ''}
+  <div class="card"><h3>Raw JSON</h3><div class="body">
+    <pre style="font-size:11px;line-height:1.5;overflow-x:auto;white-space:pre-wrap">${esc(JSON.stringify(json, null, 2))}</pre>
+  </div></div>
+</div>
+</body></html>`;
+}
+
+router.get('/loads/:id/assessment.json', async (req: Request, res: Response) => {
+  const load = db.prepare('SELECT * FROM evca_spreadsheet_loads WHERE id=?').get(req.params.id) as any;
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+  if (load.status !== 'success') return res.status(400).json({ error: 'Load is not successful — cannot generate assessment report' });
+
+  const assessment = db.prepare('SELECT id, village_name FROM evca_assessments WHERE load_id=?').get(load.id) as any;
+  if (!assessment) return res.status(404).json({ error: 'No assessment record found for this load' });
+
+  try {
+    const stdout = await runAssessmentScript(assessment.id);
+    const filename = `evca_${(assessment.village_name ?? 'assessment').replace(/\s+/g, '_')}_run${load.id}.json`;
+    if (req.query.download === '1') {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.send(stdout);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to generate assessment report', detail: err.message });
+  }
+});
+
+router.get('/loads/:id/assessment-view', async (req: Request, res: Response) => {
+  const load = db.prepare('SELECT * FROM evca_spreadsheet_loads WHERE id=?').get(req.params.id) as any;
+  if (!load) return res.status(404).send('<h2>Load not found</h2>');
+  if (load.status !== 'success') return res.status(400).send('<h2>Load is not successful</h2>');
+
+  const assessment = db.prepare('SELECT id, village_name FROM evca_assessments WHERE load_id=?').get(load.id) as any;
+  if (!assessment) return res.status(404).send('<h2>No assessment found for this load</h2>');
+
+  try {
+    const stdout = await runAssessmentScript(assessment.id);
+    const json = JSON.parse(stdout);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(buildAssessmentPreview(json, Number(req.params.id)));
+  } catch (err: any) {
+    res.status(500).send(`<h2>Error</h2><pre>${esc(err.message)}</pre>`);
+  }
 });
 
 router.get('/report', (req: Request, res: Response) => {
