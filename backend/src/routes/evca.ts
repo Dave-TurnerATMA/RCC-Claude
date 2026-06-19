@@ -879,7 +879,7 @@ function runContextDocScript(assessmentId: number): Promise<string> {
   const dbPath     = path.resolve(__dirname, '../../data/community_prep.db');
   return new Promise((resolve, reject) => {
     execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId)],
-      { timeout: 120_000, maxBuffer: 4 * 1024 * 1024 },
+      { timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '' } },
       (error, stdout, stderr) => {
         if (error) return reject(new Error(stderr || error.message));
         resolve(stdout);
