@@ -229,7 +229,8 @@ function buildManagementPage(flash?: { type: 'ok' | 'err'; msg: string }, autoEx
                 : '';
               const assessmentBtns = r.status === 'success'
                 ? `<a class="btn" style="background:#8e44ad" href="/evca/loads/${r.id}/assessment-view" target="_blank">Assessment Report</a> ` +
-                  `<a class="btn" style="background:#2c3e50" href="/evca/loads/${r.id}/assessment.json?download=1">⬇ JSON</a>`
+                  `<a class="btn" style="background:#2c3e50" href="/evca/loads/${r.id}/assessment.json?download=1">⬇ JSON</a> ` +
+                  `<a class="btn" style="background:#16a085" href="/evca/loads/${r.id}/prompt.txt?download=1">⬇ LLM Prompt</a>`
                 : '';
               return `<tr>
                 <td>${fmt(r.id)}</td>
@@ -858,6 +859,20 @@ function runAssessmentScript(assessmentId: number): Promise<string> {
   });
 }
 
+function runPromptScript(assessmentId: number): Promise<string> {
+  const scriptPath = path.resolve(__dirname, '../../../evca/scripts/generate_village_context_doc.py');
+  const dbPath     = path.resolve(__dirname, '../../data/community_prep.db');
+  return new Promise((resolve, reject) => {
+    execFile('python3', [scriptPath, '--db', dbPath, '--assessment-id', String(assessmentId)],
+      { timeout: 30_000 },
+      (error, stdout, stderr) => {
+        if (error) return reject(new Error(stderr || error.message));
+        resolve(stdout);
+      }
+    );
+  });
+}
+
 function buildAssessmentPreview(json: any, runId: number): string {
   const v = json.village_profile ?? {};
   const profile = Object.entries(v).map(([k, val]) =>
@@ -959,6 +974,27 @@ router.get('/loads/:id/assessment-view', async (req: Request, res: Response) => 
     res.send(buildAssessmentPreview(json, Number(req.params.id)));
   } catch (err: any) {
     res.status(500).send(`<h2>Error</h2><pre>${esc(err.message)}</pre>`);
+  }
+});
+
+router.get('/loads/:id/prompt.txt', async (req: Request, res: Response) => {
+  const load = db.prepare('SELECT * FROM evca_spreadsheet_loads WHERE id=?').get(req.params.id) as any;
+  if (!load) return res.status(404).send('Load not found');
+  if (load.status !== 'success') return res.status(400).send('Load is not successful');
+
+  const assessment = db.prepare('SELECT id, village_name FROM evca_assessments WHERE load_id=?').get(load.id) as any;
+  if (!assessment) return res.status(404).send('No assessment found for this load');
+
+  try {
+    const prompt = await runPromptScript(assessment.id);
+    const filename = `evca_${(assessment.village_name ?? 'assessment').replace(/\s+/g, '_')}_run${load.id}_prompt.txt`;
+    if (req.query.download === '1') {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(prompt);
+  } catch (err: any) {
+    res.status(500).send(`Error generating prompt: ${err.message}`);
   }
 });
 
