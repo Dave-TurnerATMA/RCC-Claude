@@ -34,7 +34,7 @@ cd "$APP_DIR/frontend" && npm run build
 cd "$APP_DIR/backend"  && npx tsc
 
 info "Restarting app…"
-pm2 restart community-prep
+pm2 restart community-prep --update-env
 pm2 save
 
 success "Update complete — app restarted"
